@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { setAdminAuth } from "@/lib/auth";
 
 const perks = [
@@ -82,6 +83,10 @@ export default function AdminLoginPage() {
         </div>
       ))}
 
+      <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
+        <ThemeToggle className="text-primary-200 hover:bg-white/10 hover:text-white" />
+      </div>
+
       <div className="relative w-full max-w-md">
         <div className="mb-8 flex flex-col items-center gap-4 animate-fade-up">
           <Logo variant="light" />
@@ -90,16 +95,16 @@ export default function AdminLoginPage() {
           </span>
         </div>
 
-        <div className="animate-scale-in stagger-1 rounded-3xl bg-white p-8 shadow-2xl shadow-black/30 ring-1 ring-white/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.4)] sm:p-10">
-          <h2 className="font-heading text-2xl font-extrabold text-primary-900">Welcome back</h2>
-          <p className="mt-1.5 text-sm text-slate-500">Sign in to access the Zoiko Rooms admin panel.</p>
+        <div className="animate-scale-in stagger-1 rounded-3xl bg-white p-8 shadow-2xl shadow-black/30 ring-1 ring-white/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.4)] sm:p-10 dark:bg-slate-900">
+          <h2 className="font-heading text-2xl font-extrabold text-primary-900 dark:text-white">Welcome back</h2>
+          <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">Sign in to access the Zoiko Rooms admin panel.</p>
 
           <form onSubmit={handleSubmit} className="mt-7 space-y-4">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Email address
               </span>
-              <div className="group flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200 transition-all duration-200 hover:ring-primary-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-400 focus-within:shadow-md focus-within:shadow-primary-900/5">
+              <div className="group flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200 transition-all duration-200 hover:ring-primary-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-400 focus-within:shadow-md focus-within:shadow-primary-900/5 dark:bg-slate-800 dark:ring-slate-700 dark:focus-within:bg-slate-800">
                 <Mail className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-focus-within:text-primary-600" />
                 <input
                   type="email"
@@ -107,16 +112,16 @@ export default function AdminLoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@zoikorooms.com"
                   autoComplete="username"
-                  className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                  className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100"
                 />
               </div>
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Password
               </span>
-              <div className="group flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200 transition-all duration-200 hover:ring-primary-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-400 focus-within:shadow-md focus-within:shadow-primary-900/5">
+              <div className="group flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200 transition-all duration-200 hover:ring-primary-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-primary-400 focus-within:shadow-md focus-within:shadow-primary-900/5 dark:bg-slate-800 dark:ring-slate-700 dark:focus-within:bg-slate-800">
                 <Lock className="h-4 w-4 shrink-0 text-slate-400 transition-colors group-focus-within:text-primary-600" />
                 <input
                   type={showPassword ? "text" : "password"}
@@ -124,7 +129,7 @@ export default function AdminLoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                  className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100"
                 />
                 <button
                   type="button"
@@ -138,7 +143,7 @@ export default function AdminLoginPage() {
             </label>
 
             <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 text-slate-500">
+              <label className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
                 <input
                   type="checkbox"
                   checked={remember}
@@ -147,7 +152,7 @@ export default function AdminLoginPage() {
                 />
                 Remember me
               </label>
-              <a href="#" className="font-medium text-primary-700 transition-colors hover:text-accent-600">
+              <a href="#" className="font-medium text-primary-700 transition-colors hover:text-accent-600 dark:text-primary-300">
                 Forgot password?
               </a>
             </div>
@@ -170,18 +175,18 @@ export default function AdminLoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 flex items-center gap-2 rounded-xl bg-primary-50 px-4 py-3 text-xs text-primary-700 ring-1 ring-primary-100">
+          <div className="mt-6 flex items-center gap-2 rounded-xl bg-primary-50 px-4 py-3 text-xs text-primary-700 ring-1 ring-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-500/20">
             <ShieldCheck className="h-4 w-4 shrink-0" />
             Demo mode: enter any email &amp; password to explore the admin dashboard.
           </div>
 
-          <div className="mt-6 flex items-center justify-center gap-2 border-t border-slate-100 pt-5">
+          <div className="mt-6 flex items-center justify-center gap-2 border-t border-slate-100 pt-5 dark:border-slate-800">
             {perks.map((perk, i) => {
               const Icon = perk.icon;
               return (
                 <span
                   key={perk.text}
-                  className="animate-fade-up flex items-center gap-1.5 rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 ring-1 ring-slate-100 transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary-50 hover:text-primary-700 hover:ring-primary-100"
+                  className="animate-fade-up flex items-center gap-1.5 rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 ring-1 ring-slate-100 transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary-50 hover:text-primary-700 hover:ring-primary-100 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700 dark:hover:bg-primary-500/10 dark:hover:text-primary-300"
                   style={{ animationDelay: `${0.2 + i * 0.1}s` }}
                 >
                   <Icon className="h-3.5 w-3.5" />

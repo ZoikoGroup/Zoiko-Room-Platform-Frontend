@@ -12,8 +12,8 @@ export default function AdminPaymentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-extrabold text-primary-900">Payments</h1>
-        <p className="mt-1 text-sm text-slate-500">Track collections, pending dues and refunds.</p>
+        <h1 className="font-heading text-2xl font-extrabold text-primary-900 dark:text-white">Payments</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Track collections, pending dues and refunds.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

@@ -19,7 +19,7 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
 
   if (!checked) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
         <Loader label="Verifying session" />
       </div>
     );

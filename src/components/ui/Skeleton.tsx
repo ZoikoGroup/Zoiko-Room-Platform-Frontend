@@ -6,7 +6,7 @@ export function Skeleton({ className }: { className?: string }) {
 
 export function ListingCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-100 shadow-sm">
+    <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-slate-100 shadow-sm dark:bg-slate-900 dark:ring-slate-800">
       <Skeleton className="h-52 w-full rounded-none" />
       <div className="space-y-3 p-4">
         <Skeleton className="h-4 w-1/3" />

@@ -214,14 +214,14 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
         <StatCard label="Avg. Price" value={formatCurrency(stats.avgPrice)} change="Blended" icon={Building2} index={3} />
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+      <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-white/10">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-400" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search properties by name or city"
-            className="w-full rounded-full bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none ring-1 ring-slate-100 transition-all focus:ring-primary-300"
+            className="w-full rounded-full bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none ring-1 ring-slate-100 transition-all focus:ring-primary-300 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
           />
         </div>
         <div className="flex flex-wrap gap-2">
@@ -234,7 +234,7 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
                 className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
                   type === t
                     ? "bg-primary-700 text-white shadow-md shadow-primary-900/25"
-                    : "bg-slate-50 text-slate-500 hover:bg-primary-50 hover:text-primary-700"
+                    : "bg-slate-50 text-slate-500 hover:bg-primary-50 hover:text-primary-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-primary-500/10 dark:hover:text-primary-300"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -252,7 +252,7 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
         {filtered.map((listing, i) => (
           <div
             key={listing.id}
-            className="animate-fade-up overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition-shadow duration-300 hover:shadow-lg"
+            className="animate-fade-up overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition-shadow duration-300 hover:shadow-lg dark:bg-slate-900 dark:ring-white/10"
             style={{ animationDelay: `${Math.min(i, 8) * 0.05}s` }}
           >
             <div className="relative h-40 w-full">
@@ -263,9 +263,9 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
               </Badge>
             </div>
             <div className="p-4">
-              <h3 className="truncate font-heading text-sm font-bold text-primary-900">{listing.name}</h3>
-              <p className="truncate text-xs text-slate-400">{listing.roomType}</p>
-              <div className="mt-1.5 flex items-center justify-between text-xs text-slate-500">
+              <h3 className="truncate font-heading text-sm font-bold text-primary-900 dark:text-white">{listing.name}</h3>
+              <p className="truncate text-xs text-slate-400 dark:text-slate-400">{listing.roomType}</p>
+              <div className="mt-1.5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                 <span className="flex items-center gap-1">
                   <MapPin className="h-3 w-3" /> {listing.city}
                 </span>
@@ -275,16 +275,16 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
               </div>
               <div className="mt-2 flex items-center justify-between">
                 <StarRating rating={listing.rating} size={12} />
-                <span className="text-sm font-bold text-primary-800">
+                <span className="text-sm font-bold text-primary-800 dark:text-primary-200">
                   {formatCurrency(listing.pricePerNight)}
-                  <span className="text-xs font-medium text-slate-400">{priceUnit[listing.propertyType]}</span>
+                  <span className="text-xs font-medium text-slate-400 dark:text-slate-400">{priceUnit[listing.propertyType]}</span>
                 </span>
               </div>
 
-              <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+              <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                   <Switch checked={listing.available} onChange={() => toggleAvailability(listing.id)} />
-                  <span className="text-xs font-medium text-slate-500">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                     {listing.available ? "Active" : "Inactive"}
                   </span>
                 </div>
@@ -292,21 +292,21 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
                   <button
                     onClick={() => duplicateListing(listing)}
                     title="Duplicate"
-                    className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-primary-50 hover:text-primary-700"
+                    className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:text-slate-400 dark:hover:bg-primary-500/10 dark:hover:text-primary-300"
                   >
                     <Copy className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => openEditModal(listing)}
                     title="Edit"
-                    className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-primary-50 hover:text-primary-700"
+                    className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:text-slate-400 dark:hover:bg-primary-500/10 dark:hover:text-primary-300"
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => removeListing(listing.id)}
                     title="Delete"
-                    className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-accent-50 hover:text-accent-600"
+                    className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-accent-50 hover:text-accent-600 dark:text-slate-400 dark:hover:bg-accent-500/10"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -318,7 +318,7 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
       </div>
 
       {filtered.length === 0 && (
-        <p className="mt-10 text-center text-sm text-slate-400">No properties match your search.</p>
+        <p className="mt-10 text-center text-sm text-slate-400 dark:text-slate-400">No properties match your search.</p>
       )}
 
       <Modal
@@ -328,27 +328,27 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
       >
         <form onSubmit={handleSubmit} className="max-h-[70vh] space-y-3.5 overflow-y-auto pr-1">
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Property Name
             </label>
             <input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="e.g. Coral Bay Villa"
-              className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400"
+              className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Category
               </label>
               <select
                 value={form.propertyType}
                 onChange={(e) => setForm((f) => ({ ...f, propertyType: e.target.value as PropertyType }))}
-                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400"
+                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
               >
                 {(Object.keys(typeMeta) as PropertyType[]).map((key) => (
                   <option key={key} value={key}>
@@ -358,33 +358,33 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Room / Unit Type
               </label>
               <input
                 value={form.roomType}
                 onChange={(e) => setForm((f) => ({ ...f, roomType: e.target.value }))}
                 placeholder={typeMeta[form.propertyType].label}
-                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400"
+                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 City
               </label>
               <input
                 value={form.city}
                 onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
                 placeholder="e.g. Goa"
-                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400"
+                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
                 required
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Price {priceUnit[form.propertyType]} (₹)
               </label>
               <input
@@ -393,7 +393,7 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
                 value={form.price}
                 onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
                 placeholder="5000"
-                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400"
+                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
                 required
               />
             </div>
@@ -401,7 +401,7 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
 
           <div className="grid grid-cols-4 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Guests
               </label>
               <input
@@ -409,11 +409,11 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
                 min={1}
                 value={form.guests}
                 onChange={(e) => setForm((f) => ({ ...f, guests: e.target.value }))}
-                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400"
+                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Beds
               </label>
               <input
@@ -421,11 +421,11 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
                 min={0}
                 value={form.bedrooms}
                 onChange={(e) => setForm((f) => ({ ...f, bedrooms: e.target.value }))}
-                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400"
+                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Baths
               </label>
               <input
@@ -433,11 +433,11 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
                 min={0}
                 value={form.bathrooms}
                 onChange={(e) => setForm((f) => ({ ...f, bathrooms: e.target.value }))}
-                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400"
+                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Size (sqft)
               </label>
               <input
@@ -445,13 +445,13 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
                 min={0}
                 value={form.size}
                 onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))}
-                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400"
+                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Description
             </label>
             <textarea
@@ -459,31 +459,31 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               rows={3}
               placeholder="Short description guests will see..."
-              className="w-full resize-none rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400"
+              className="w-full resize-none rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Amenities (comma separated)
             </label>
             <input
               value={form.amenities}
               onChange={(e) => setForm((f) => ({ ...f, amenities: e.target.value }))}
               placeholder="Free WiFi, Air Conditioning, Parking"
-              className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400"
+              className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Tags (comma separated)
             </label>
             <input
               value={form.tags}
               onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
               placeholder="Best Seller, Free Cancellation"
-              className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400"
+              className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
             />
           </div>
 

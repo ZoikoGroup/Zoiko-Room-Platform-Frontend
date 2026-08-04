@@ -2,6 +2,7 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { bookingsByType } from "@/data/analytics";
+import { useTheme } from "@/hooks/useTheme";
 
 const colors: Record<string, string> = {
   "Hotel Rooms": "#0e2f73",
@@ -10,6 +11,7 @@ const colors: Record<string, string> = {
 };
 
 export function BookingsByTypeChart() {
+  const isDark = useTheme() === "dark";
   const total = bookingsByType.reduce((sum, d) => sum + d.value, 0);
 
   return (
@@ -31,12 +33,20 @@ export function BookingsByTypeChart() {
                 <Cell key={entry.type} fill={colors[entry.type]} />
               ))}
             </Pie>
-            <Tooltip />
+            <Tooltip
+              contentStyle={{
+                borderRadius: 12,
+                background: isDark ? "#0f172a" : "#ffffff",
+                border: isDark ? "1px solid #1e293b" : "1px solid #eef2fa",
+              }}
+              labelStyle={{ color: isDark ? "#e2e8f0" : "#0f172a" }}
+              itemStyle={{ color: isDark ? "#e2e8f0" : "#0f172a" }}
+            />
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="font-heading text-xl font-extrabold text-primary-900">{total}</span>
-          <span className="text-[11px] text-slate-400">Bookings</span>
+          <span className="font-heading text-xl font-extrabold text-primary-900 dark:text-white">{total}</span>
+          <span className="text-[11px] text-slate-400 dark:text-slate-400">Bookings</span>
         </div>
       </div>
 
@@ -47,8 +57,8 @@ export function BookingsByTypeChart() {
               className="h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: colors[d.type] }}
             />
-            <span className="text-slate-600">{d.type}</span>
-            <span className="font-semibold text-primary-900">{d.value}</span>
+            <span className="text-slate-600 dark:text-slate-300">{d.type}</span>
+            <span className="font-semibold text-primary-900 dark:text-white">{d.value}</span>
           </div>
         ))}
       </div>

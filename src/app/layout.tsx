@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
+import { THEME_INLINE_SCRIPT } from "@/lib/theme";
 
 const heading = Plus_Jakarta_Sans({
   variable: "--font-heading",
@@ -27,9 +28,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-theme="light"
+      suppressHydrationWarning
       className={`${heading.variable} ${body.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans bg-white text-slate-800">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{ __html: THEME_INLINE_SCRIPT }}
+        />
+      </head>
+      <body className="min-h-full flex flex-col font-sans bg-white text-slate-800 dark:bg-slate-950 dark:text-slate-200">
         {children}
       </body>
     </html>

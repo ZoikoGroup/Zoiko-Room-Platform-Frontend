@@ -11,8 +11,11 @@ import {
 } from "recharts";
 import { revenueTrend } from "@/data/analytics";
 import { formatCurrency } from "@/lib/utils";
+import { useTheme } from "@/hooks/useTheme";
 
 export function RevenueChart() {
+  const isDark = useTheme() === "dark";
+
   return (
     <div className="h-72 w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -23,17 +26,17 @@ export function RevenueChart() {
               <stop offset="100%" stopColor="#0e2f73" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid vertical={false} stroke="#eef2fa" />
+          <CartesianGrid vertical={false} stroke={isDark ? "#1e293b" : "#eef2fa"} />
           <XAxis
             dataKey="month"
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "#64748b", fontSize: 12 }}
+            tick={{ fill: isDark ? "#94a3b8" : "#64748b", fontSize: 12 }}
           />
           <YAxis
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "#64748b", fontSize: 12 }}
+            tick={{ fill: isDark ? "#94a3b8" : "#64748b", fontSize: 12 }}
             tickFormatter={(v) => `₹${v / 1000}k`}
             width={48}
           />
@@ -41,9 +44,12 @@ export function RevenueChart() {
             formatter={(value) => formatCurrency(Number(value))}
             contentStyle={{
               borderRadius: 12,
-              border: "1px solid #eef2fa",
-              boxShadow: "0 8px 24px rgba(14,47,115,0.12)",
+              background: isDark ? "#0f172a" : "#ffffff",
+              border: isDark ? "1px solid #1e293b" : "1px solid #eef2fa",
+              boxShadow: isDark ? "0 8px 24px rgba(0,0,0,0.4)" : "0 8px 24px rgba(14,47,115,0.12)",
             }}
+            labelStyle={{ color: isDark ? "#e2e8f0" : "#0f172a" }}
+            itemStyle={{ color: isDark ? "#e2e8f0" : "#0f172a" }}
           />
           <Area
             type="monotone"

@@ -18,8 +18,9 @@ const variantClasses: Record<Variant, string> = {
   accent:
     "bg-accent-600 text-white shadow-lg shadow-accent-700/30 hover:bg-accent-700 hover:shadow-xl hover:shadow-accent-700/35 focus-visible:ring-accent-300",
   outline:
-    "border-2 border-primary-700 text-primary-700 hover:bg-primary-50 focus-visible:ring-primary-200",
-  ghost: "text-primary-700 hover:bg-primary-50 focus-visible:ring-primary-200",
+    "border-2 border-primary-700 text-primary-700 hover:bg-primary-50 focus-visible:ring-primary-200 dark:text-primary-300 dark:border-primary-400/60 dark:hover:bg-primary-500/10",
+  ghost:
+    "text-primary-700 hover:bg-primary-50 focus-visible:ring-primary-200 dark:text-primary-300 dark:hover:bg-primary-500/10",
   white:
     "bg-white text-primary-800 shadow-lg shadow-black/10 hover:shadow-xl hover:bg-primary-50 focus-visible:ring-white",
 };

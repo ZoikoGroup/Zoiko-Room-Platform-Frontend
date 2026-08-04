@@ -9,7 +9,11 @@ export function StarRating({ rating, size = 14 }: { rating: number; size?: numbe
           <Star
             key={i}
             size={size}
-            className={filled ? "fill-accent-500 text-accent-500" : "fill-slate-200 text-slate-200"}
+            className={
+              filled
+                ? "fill-accent-500 text-accent-500"
+                : "fill-slate-200 text-slate-200 dark:fill-slate-700 dark:text-slate-700"
+            }
           />
         );
       })}
