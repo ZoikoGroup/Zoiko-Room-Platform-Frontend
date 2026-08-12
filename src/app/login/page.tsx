@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   BarChart3,
@@ -16,7 +17,8 @@ import {
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { setAdminAuth } from "@/lib/auth";
+import { login } from "@/lib/auth";
+import { ApiError } from "@/lib/api-client";
 
 const perks = [
   { icon: CalendarCheck2, text: "Bookings" },
@@ -40,7 +42,7 @@ export default function AdminLoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
       setError("Please enter both email and password.");
@@ -48,10 +50,14 @@ export default function AdminLoginPage() {
     }
     setError("");
     setSubmitting(true);
-    setTimeout(() => {
-      setAdminAuth(email.trim());
+    try {
+      await login(email.trim(), password);
       router.push("/");
-    }, 900);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -175,10 +181,12 @@ export default function AdminLoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 flex items-center gap-2 rounded-xl bg-primary-50 px-4 py-3 text-xs text-primary-700 ring-1 ring-primary-100 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-500/20">
-            <ShieldCheck className="h-4 w-4 shrink-0" />
-            Demo mode: enter any email &amp; password to explore the admin dashboard.
-          </div>
+          <p className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
+            New here?{" "}
+            <Link href="/register" className="font-semibold text-primary-700 hover:text-accent-600 dark:text-primary-300">
+              Register as an admin
+            </Link>
+          </p>
 
           <div className="mt-6 flex items-center justify-center gap-2 border-t border-slate-100 pt-5 dark:border-slate-800">
             {perks.map((perk, i) => {

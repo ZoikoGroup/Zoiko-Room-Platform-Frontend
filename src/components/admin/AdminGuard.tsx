@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isAdminAuthed } from "@/lib/auth";
+import { getCurrentAdmin } from "@/lib/auth";
 import { Loader } from "@/components/ui/Loader";
 
 export function AdminGuard({ children }: { children: React.ReactNode }) {
@@ -10,11 +10,13 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    if (isAdminAuthed()) {
-      setChecked(true);
-    } else {
-      router.replace("/login");
-    }
+    getCurrentAdmin().then((admin) => {
+      if (admin) {
+        setChecked(true);
+      } else {
+        router.replace("/login");
+      }
+    });
   }, [router]);
 
   if (!checked) {

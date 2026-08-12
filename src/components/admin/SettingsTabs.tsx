@@ -5,9 +5,21 @@ import { CheckCircle2, Image as ImageIcon, Lock, User, Bell } from "lucide-react
 import { Button } from "@/components/ui/Button";
 import { Switch } from "@/components/ui/Switch";
 import { Logo } from "@/components/ui/Logo";
-import { getAdminEmail } from "@/lib/auth";
-import { getLogoUrl, setLogoUrl } from "@/lib/branding";
+import { getCurrentAdmin } from "@/lib/auth";
+import { apiClientFetch, ApiError } from "@/lib/api-client";
+import { LOGO_UPDATED_EVENT } from "@/lib/branding";
 import { cn } from "@/lib/utils";
+
+interface BrandingResponse {
+  logoUrl: string;
+}
+
+interface NotificationsResponse {
+  newBooking: boolean;
+  payments: boolean;
+  reviews: boolean;
+  marketing: boolean;
+}
 
 const tabs = [
   { key: "profile", label: "Profile", icon: User },
@@ -18,14 +30,19 @@ const tabs = [
 
 export function SettingsTabs() {
   const [active, setActive] = useState<(typeof tabs)[number]["key"]>("branding");
-  const [email, setEmail] = useState("");
+  const [profile, setProfile] = useState({ fullName: "", email: "", phone: "" });
   const [logoInput, setLogoInput] = useState("");
   const [toast, setToast] = useState("");
   const [notifs, setNotifs] = useState({ newBooking: true, payments: true, reviews: false, marketing: false });
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
 
   useEffect(() => {
-    setEmail(getAdminEmail());
-    setLogoInput(getLogoUrl());
+    getCurrentAdmin().then((admin) => {
+      if (admin) setProfile({ fullName: admin.fullName, email: admin.email, phone: admin.phone });
+    });
+    apiClientFetch<BrandingResponse>("/api/settings/branding").then((b) => setLogoInput(b.logoUrl));
+    apiClientFetch<NotificationsResponse>("/api/settings/notifications").then(setNotifs);
   }, []);
 
   function showToast(message: string) {
@@ -33,10 +50,66 @@ export function SettingsTabs() {
     setTimeout(() => setToast(""), 2200);
   }
 
+  async function handleSaveProfile() {
+    try {
+      const updated = await apiClientFetch<{ fullName: string; email: string; phone: string }>("/api/settings/profile", {
+        method: "PUT",
+        body: JSON.stringify(profile),
+      });
+      setProfile(updated);
+      showToast("Profile updated");
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "Failed to update profile");
+    }
+  }
+
+  async function saveLogo(url: string) {
+    try {
+      const updated = await apiClientFetch<BrandingResponse>("/api/settings/branding", {
+        method: "PUT",
+        body: JSON.stringify({ logoUrl: url }),
+      });
+      setLogoInput(updated.logoUrl);
+      window.dispatchEvent(new Event(LOGO_UPDATED_EVENT));
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "Failed to update logo");
+    }
+  }
+
   function handleSaveLogo(e: React.FormEvent) {
     e.preventDefault();
-    setLogoUrl(logoInput.trim());
-    showToast("Logo updated across the site");
+    saveLogo(logoInput.trim()).then(() => showToast("Logo updated across the site"));
+  }
+
+  async function handleSaveNotifications() {
+    try {
+      const updated = await apiClientFetch<NotificationsResponse>("/api/settings/notifications", {
+        method: "PUT",
+        body: JSON.stringify(notifs),
+      });
+      setNotifs(updated);
+      showToast("Notification preferences saved");
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "Failed to save preferences");
+    }
+  }
+
+  async function handleChangePassword() {
+    if (!currentPassword || !newPassword) {
+      showToast("Enter both current and new password");
+      return;
+    }
+    try {
+      await apiClientFetch("/api/auth/password", {
+        method: "PUT",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      showToast("Password updated");
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : "Failed to update password");
+    }
   }
 
   return (
@@ -67,7 +140,8 @@ export function SettingsTabs() {
                 Full Name
               </label>
               <input
-                defaultValue="Zoiko Admin"
+                value={profile.fullName}
+                onChange={(e) => setProfile((p) => ({ ...p, fullName: e.target.value }))}
                 className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
               />
             </div>
@@ -76,8 +150,8 @@ export function SettingsTabs() {
                 Email
               </label>
               <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={profile.email}
+                onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))}
                 className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
               />
             </div>
@@ -86,11 +160,13 @@ export function SettingsTabs() {
                 Phone
               </label>
               <input
+                value={profile.phone}
+                onChange={(e) => setProfile((p) => ({ ...p, phone: e.target.value }))}
                 placeholder="+91 98200 11223"
                 className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
               />
             </div>
-            <Button onClick={() => showToast("Profile updated")}>Save Changes</Button>
+            <Button onClick={handleSaveProfile}>Save Changes</Button>
           </div>
         )}
 
@@ -125,8 +201,7 @@ export function SettingsTabs() {
                   variant="outline"
                   onClick={() => {
                     setLogoInput("");
-                    setLogoUrl("");
-                    showToast("Reverted to default logo");
+                    saveLogo("").then(() => showToast("Reverted to default logo"));
                   }}
                 >
                   Reset to Default
@@ -153,7 +228,7 @@ export function SettingsTabs() {
                 />
               </div>
             ))}
-            <Button onClick={() => showToast("Notification preferences saved")}>Save Preferences</Button>
+            <Button onClick={handleSaveNotifications}>Save Preferences</Button>
           </div>
         )}
 
@@ -166,6 +241,8 @@ export function SettingsTabs() {
               </label>
               <input
                 type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
                 className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
               />
             </div>
@@ -175,10 +252,12 @@ export function SettingsTabs() {
               </label>
               <input
                 type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
               />
             </div>
-            <Button onClick={() => showToast("Password updated")}>Update Password</Button>
+            <Button onClick={handleChangePassword}>Update Password</Button>
           </div>
         )}
       </div>

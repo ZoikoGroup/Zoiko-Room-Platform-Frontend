@@ -9,11 +9,16 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { revenueTrend } from "@/data/analytics";
 import { formatCurrency } from "@/lib/utils";
 import { useTheme } from "@/hooks/useTheme";
 
-export function RevenueChart() {
+export interface RevenueTrendPoint {
+  month: string;
+  revenue: number;
+  bookings: number;
+}
+
+export function RevenueChart({ data: revenueTrend }: { data: RevenueTrendPoint[] }) {
   const isDark = useTheme() === "dark";
 
   return (

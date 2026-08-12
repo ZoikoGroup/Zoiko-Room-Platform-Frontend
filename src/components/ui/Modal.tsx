@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export function Modal({
   open,
@@ -14,6 +14,8 @@ export function Modal({
   title: string;
   children: React.ReactNode;
 }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -21,10 +23,18 @@ export function Modal({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open || !contentRef.current) return;
+    // A form's own overflow-y-auto container can end up scrolled (e.g. by
+    // browser autofill jumping to a field) -- always reset it to the top on open.
+    const scrollable = contentRef.current.querySelector<HTMLElement>(".overflow-y-auto");
+    scrollable?.scrollTo({ top: 0 });
+  }, [open]);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto p-4 pt-10 sm:pt-16">
       <button
         aria-label="Close modal"
         onClick={onClose}
@@ -37,7 +47,9 @@ export function Modal({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="mt-4">{children}</div>
+        <div className="mt-4" ref={contentRef}>
+          {children}
+        </div>
       </div>
     </div>
   );

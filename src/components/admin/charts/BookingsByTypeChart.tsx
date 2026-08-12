@@ -1,16 +1,19 @@
 "use client";
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { bookingsByType } from "@/data/analytics";
 import { useTheme } from "@/hooks/useTheme";
 
-const colors: Record<string, string> = {
-  "Hotel Rooms": "#0e2f73",
-  Villas: "#d80b0b",
-  Houses: "#8da8e1",
-};
+export interface BookingsByTypePoint {
+  type: string;
+  value: number;
+}
 
-export function BookingsByTypeChart() {
+const colors: Record<string, string> = {
+  "Private Rooms": "#0e2f73",
+};
+const fallbackColor = "#94a3b8";
+
+export function BookingsByTypeChart({ data: bookingsByType }: { data: BookingsByTypePoint[] }) {
   const isDark = useTheme() === "dark";
   const total = bookingsByType.reduce((sum, d) => sum + d.value, 0);
 
@@ -30,7 +33,7 @@ export function BookingsByTypeChart() {
               stroke="none"
             >
               {bookingsByType.map((entry) => (
-                <Cell key={entry.type} fill={colors[entry.type]} />
+                <Cell key={entry.type} fill={colors[entry.type] ?? fallbackColor} />
               ))}
             </Pie>
             <Tooltip
@@ -55,7 +58,7 @@ export function BookingsByTypeChart() {
           <div key={d.type} className="flex items-center gap-2 text-sm">
             <span
               className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: colors[d.type] }}
+              style={{ backgroundColor: colors[d.type] ?? fallbackColor }}
             />
             <span className="text-slate-600 dark:text-slate-300">{d.type}</span>
             <span className="font-semibold text-primary-900 dark:text-white">{d.value}</span>

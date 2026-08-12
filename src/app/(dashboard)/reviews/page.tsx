@@ -1,7 +1,11 @@
 import { ReviewsList } from "@/components/admin/ReviewsList";
-import { reviews } from "@/data/reviews";
+import { apiFetch, requireSuperAdmin } from "@/lib/api";
+import { Review } from "@/lib/types";
 
-export default function AdminReviewsPage() {
+export default async function AdminReviewsPage() {
+  await requireSuperAdmin();
+  const reviews = await apiFetch<Review[]>("/api/reviews");
+
   return (
     <div className="space-y-6">
       <div>

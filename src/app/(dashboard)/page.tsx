@@ -1,18 +1,28 @@
 import Link from "next/link";
 import { BedDouble, CalendarRange, IndianRupee, Users } from "lucide-react";
 import { StatCard } from "@/components/admin/StatCard";
-import { RevenueChart } from "@/components/admin/charts/RevenueChart";
-import { BookingsByTypeChart } from "@/components/admin/charts/BookingsByTypeChart";
-import { OccupancyChart } from "@/components/admin/charts/OccupancyChart";
+import { RevenueChart, RevenueTrendPoint } from "@/components/admin/charts/RevenueChart";
+import { BookingsByTypeChart, BookingsByTypePoint } from "@/components/admin/charts/BookingsByTypeChart";
+import { OccupancyChart, OccupancyByCityPoint } from "@/components/admin/charts/OccupancyChart";
 import { Badge } from "@/components/ui/Badge";
 import { StarRating } from "@/components/ui/StarRating";
-import { bookings } from "@/data/bookings";
-import { guests } from "@/data/guests";
-import { listings } from "@/data/listings";
+import { apiFetch, requireSuperAdmin } from "@/lib/api";
+import { Booking, Guest, Listing } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { bookingStatusTone } from "@/lib/status";
 
-export default function AdminDashboardPage() {
+export default async function AdminDashboardPage() {
+  await requireSuperAdmin();
+
+  const [bookings, guests, listings, revenueTrend, bookingsByType, occupancyByCity] = await Promise.all([
+    apiFetch<Booking[]>("/api/bookings"),
+    apiFetch<Guest[]>("/api/guests"),
+    apiFetch<Listing[]>("/api/listings"),
+    apiFetch<RevenueTrendPoint[]>("/api/analytics/revenue-trend"),
+    apiFetch<BookingsByTypePoint[]>("/api/analytics/bookings-by-type"),
+    apiFetch<OccupancyByCityPoint[]>("/api/analytics/occupancy-by-city"),
+  ]);
+
   const totalRevenue = bookings.filter((b) => b.paymentStatus === "paid").reduce((s, b) => s + b.totalAmount, 0);
   const activeGuests = guests.filter((g) => g.status === "active").length;
   const avgRating = (listings.reduce((s, l) => s + l.rating, 0) / listings.length).toFixed(1);
@@ -42,14 +52,14 @@ export default function AdminDashboardPage() {
             <Badge tone="success">Last 6 months</Badge>
           </div>
           <div className="mt-2">
-            <RevenueChart />
+            <RevenueChart data={revenueTrend} />
           </div>
         </div>
 
         <div className="animate-fade-up rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100 dark:bg-slate-900 dark:ring-white/10">
           <h2 className="font-heading text-base font-bold text-primary-900 dark:text-white">Bookings by Stay Type</h2>
           <div className="mt-4">
-            <BookingsByTypeChart />
+            <BookingsByTypeChart data={bookingsByType} />
           </div>
         </div>
       </div>
@@ -58,7 +68,7 @@ export default function AdminDashboardPage() {
         <div className="animate-fade-up rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100 lg:col-span-2 dark:bg-slate-900 dark:ring-white/10">
           <h2 className="font-heading text-base font-bold text-primary-900 dark:text-white">Occupancy by City</h2>
           <div className="mt-2">
-            <OccupancyChart />
+            <OccupancyChart data={occupancyByCity} />
           </div>
         </div>
 

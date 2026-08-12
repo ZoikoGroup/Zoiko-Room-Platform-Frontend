@@ -1,13 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Mail, Phone, Search } from "lucide-react";
 import { Guest } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export function GuestsTable({ guests }: { guests: Guest[] }) {
-  const [query, setQuery] = useState("");
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
 
   const filtered = useMemo(() => {

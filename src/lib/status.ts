@@ -10,3 +10,102 @@ export const paymentStatusTone = {
   unpaid: "warning",
   refunded: "neutral",
 } as const;
+
+export const listingStateTone = {
+  DRAFT: "neutral",
+  EVIDENCE_PENDING: "warning",
+  REVIEW: "primary",
+  PUBLISHED: "success",
+  PAUSED: "warning",
+  SUSPENDED: "danger",
+  WITHDRAWN: "neutral",
+  ARCHIVED: "neutral",
+} as const;
+
+export const listingStateLabel = {
+  DRAFT: "Draft",
+  EVIDENCE_PENDING: "Evidence Pending",
+  REVIEW: "In Review",
+  PUBLISHED: "Published",
+  PAUSED: "Paused",
+  SUSPENDED: "Suspended",
+  WITHDRAWN: "Withdrawn",
+  ARCHIVED: "Archived",
+} as const;
+
+export const applicationStatusTone = {
+  SUBMITTED: "warning",
+  WITHDRAWN: "neutral",
+  DECIDED: "success",
+} as const;
+
+export const offerStatusTone = {
+  DRAFT: "neutral",
+  SENT: "warning",
+  ACCEPTED: "success",
+  DECLINED: "danger",
+  EXPIRED: "neutral",
+  WITHDRAWN: "neutral",
+} as const;
+
+export const agreementStatusTone = {
+  DRAFT: "neutral",
+  SENT: "warning",
+  SIGNED: "success",
+  VOID: "danger",
+} as const;
+
+export const occupancyStatusTone = {
+  PENDING_MOVE_IN: "warning",
+  ACTIVE: "success",
+  ENDED: "neutral",
+} as const;
+
+export const obligationStatusTone = {
+  PENDING: "warning",
+  PARTIALLY_PAID: "warning",
+  PAID: "success",
+  WAIVED: "neutral",
+  FAILED: "danger",
+  REFUNDED: "neutral",
+} as const;
+
+// Distinct from the legacy `paymentStatusTone` above (which covers the old
+// short-stay Payment.status values paid/unpaid/refunded).
+export const simulatedPaymentStatusTone = {
+  PENDING: "warning",
+  SUCCEEDED: "success",
+  FAILED: "danger",
+} as const;
+
+export const depositStatusTone = {
+  HELD: "warning",
+  RELEASED: "success",
+  FORFEITED: "danger",
+  PARTIALLY_RELEASED: "warning",
+} as const;
+
+export const payoutStatusTone = {
+  PENDING: "warning",
+  PAID: "success",
+  FAILED: "danger",
+  HELD: "danger",
+} as const;
+
+export const refundStatusTone = {
+  REQUESTED: "warning",
+  APPROVED: "primary",
+  REJECTED: "danger",
+  COMPLETED: "success",
+} as const;
+
+export const disputeStatusTone = {
+  OPEN: "warning",
+  RESOLVED: "success",
+  REJECTED: "danger",
+} as const;
+
+export const reconciliationStatusTone = {
+  CLEAN: "success",
+  DISCREPANCIES_FOUND: "danger",
+} as const;

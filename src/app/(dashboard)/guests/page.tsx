@@ -1,7 +1,11 @@
 import { GuestsTable } from "@/components/admin/GuestsTable";
-import { guests } from "@/data/guests";
+import { apiFetch, requireSuperAdmin } from "@/lib/api";
+import { Guest } from "@/lib/types";
 
-export default function AdminGuestsPage() {
+export default async function AdminGuestsPage() {
+  await requireSuperAdmin();
+  const guests = await apiFetch<Guest[]>("/api/guests");
+
   return (
     <div className="space-y-6">
       <div>

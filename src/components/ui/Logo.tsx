@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getLogoUrl, LOGO_UPDATED_EVENT } from "@/lib/branding";
+import { apiClientFetch } from "@/lib/api-client";
+import { LOGO_UPDATED_EVENT } from "@/lib/branding";
 
 const DEFAULT_LOGO = "/logo.webp";
 
@@ -19,14 +20,16 @@ export function Logo({ src, href = "/", className, imgClassName }: LogoProps) {
 
   useEffect(() => {
     if (src) return;
-    setStoredLogo(getLogoUrl());
-    const onUpdate = () => setStoredLogo(getLogoUrl());
-    window.addEventListener(LOGO_UPDATED_EVENT, onUpdate);
-    window.addEventListener("storage", onUpdate);
-    return () => {
-      window.removeEventListener(LOGO_UPDATED_EVENT, onUpdate);
-      window.removeEventListener("storage", onUpdate);
-    };
+
+    function fetchLogo() {
+      apiClientFetch<{ logoUrl: string }>("/api/settings/branding")
+        .then((b) => setStoredLogo(b.logoUrl))
+        .catch(() => setStoredLogo(""));
+    }
+
+    fetchLogo();
+    window.addEventListener(LOGO_UPDATED_EVENT, fetchLogo);
+    return () => window.removeEventListener(LOGO_UPDATED_EVENT, fetchLogo);
   }, [src]);
 
   const resolvedSrc = src || storedLogo || DEFAULT_LOGO;

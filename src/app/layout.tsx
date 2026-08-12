@@ -15,9 +15,9 @@ const body = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Zoiko Rooms | Hotels, Villas & Houses",
+  title: "Zoiko Rooms | Verified Long-Term Room Shares",
   description:
-    "Book hotel rooms, villas and houses with Zoiko Rooms — verified stays, instant booking, and 24/7 support.",
+    "Find a verified private room for a 30+ night stay with Zoiko Rooms — authority-checked listings, compliant leases, and 24/7 support.",
 };
 
 export default function RootLayout({

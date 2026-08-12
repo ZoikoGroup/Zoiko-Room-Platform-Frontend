@@ -1,0 +1,451 @@
+from datetime import datetime, timezone
+
+from fastapi import HTTPException, status
+from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.crud.authority import get_valid_authority_for_room
+from app.crud.occupancy import generate_next_rent_obligation
+from app.crud.party import assert_provider_access, get_or_create_default_party
+from app.models.admin_user import AdminUser
+from app.models.finance import (
+    PLATFORM_FEE_RATE,
+    DepositRecord,
+    DisputeCase,
+    Obligation,
+    PaymentAllocation,
+    PayoutRecord,
+    ReconciliationRun,
+    RefundRequest,
+    SimulatedPayment,
+)
+from app.models.leasing import Agreement, Offer
+from app.models.listing import Listing
+from app.models.occupancy import Occupancy
+from app.models.party import Party
+from app.schemas.finance import (
+    DepositRelease,
+    DisputeCreate,
+    DisputeResolve,
+    ObligationRead,
+    PaymentConfirm,
+    RefundDecide,
+    RefundRequestCreate,
+    SimulatedPaymentCreate,
+)
+
+
+def _round2(amount) -> float:
+    return round(float(amount), 2)
+
+
+def recompute_obligation_status(db: Session, obligation: Obligation) -> None:
+    """The only place `Obligation.status` is ever assigned -- derived from the actual
+    allocation sum so it can't drift from the ledger."""
+    allocated = sum(_round2(a.amount_allocated) for a in obligation.allocations)
+    outstanding = _round2(obligation.amount) - allocated
+
+    if obligation.status in ("WAIVED", "FAILED"):
+        return  # terminal states set explicitly elsewhere, not derived from allocations
+    if allocated <= 0:
+        obligation.status = "PENDING"
+    elif outstanding <= 0:
+        obligation.status = "REFUNDED" if allocated < 0 else "PAID"
+    else:
+        obligation.status = "PARTIALLY_PAID"
+
+
+def get_amount_outstanding(obligation: Obligation) -> float:
+    allocated = sum(_round2(a.amount_allocated) for a in obligation.allocations)
+    return _round2(obligation.amount) - allocated
+
+
+def to_obligation_read(obligation: Obligation) -> ObligationRead:
+    guest_id = obligation.agreement.offer.guest_id if obligation.agreement else obligation.occupancy.guest_id
+    return ObligationRead(
+        id=obligation.id,
+        obligation_type=obligation.obligation_type,
+        money_plane=obligation.money_plane,
+        amount=obligation.amount,
+        currency=obligation.currency,
+        due_date=obligation.due_date,
+        status=obligation.status,
+        guest_id=guest_id,
+        agreement_id=obligation.agreement_id,
+        occupancy_id=obligation.occupancy_id,
+        payout_id=obligation.payout_id,
+        created_at=obligation.created_at,
+    )
+
+
+def _owned_listing_ids(db: Session, admin: AdminUser):
+    return select(Listing.id).where(Listing.owner_id == admin.id)
+
+
+def _owned_occupancy_ids(db: Session, admin: AdminUser):
+    return select(Occupancy.id).where(Occupancy.listing_id.in_(_owned_listing_ids(db, admin)))
+
+
+def _owned_obligation_ids(db: Session, admin: AdminUser) -> set[int]:
+    """A regular admin only owns obligations reachable through one of their own
+    listings -- either via the initial agreement-linked obligation, or via a
+    recurring occupancy-linked one."""
+    via_agreement = db.scalars(
+        select(Obligation.id)
+        .join(Agreement, Agreement.id == Obligation.agreement_id)
+        .join(Offer, Offer.id == Agreement.offer_id)
+        .where(Offer.listing_id.in_(_owned_listing_ids(db, admin)))
+    )
+    via_occupancy = db.scalars(select(Obligation.id).where(Obligation.occupancy_id.in_(_owned_occupancy_ids(db, admin))))
+    return set(via_agreement) | set(via_occupancy)
+
+
+def _owned_payment_ids(db: Session, admin: AdminUser) -> set[int]:
+    obligation_ids = _owned_obligation_ids(db, admin)
+    if not obligation_ids:
+        return set()
+    return set(db.scalars(select(PaymentAllocation.payment_id).where(PaymentAllocation.obligation_id.in_(obligation_ids))))
+
+
+def list_obligations(
+    db: Session, admin: AdminUser, occupancy_id: int | None = None, agreement_id: int | None = None
+) -> list[Obligation]:
+    query = select(Obligation).order_by(Obligation.due_date)
+    if occupancy_id is not None:
+        query = query.where(Obligation.occupancy_id == occupancy_id)
+    if agreement_id is not None:
+        query = query.where(Obligation.agreement_id == agreement_id)
+    if admin.role != "super_admin":
+        query = query.where(Obligation.id.in_(_owned_obligation_ids(db, admin)))
+    return list(db.scalars(query))
+
+
+def list_payments(db: Session, admin: AdminUser) -> list[SimulatedPayment]:
+    query = select(SimulatedPayment).order_by(SimulatedPayment.created_at.desc())
+    if admin.role != "super_admin":
+        query = query.where(SimulatedPayment.id.in_(_owned_payment_ids(db, admin)))
+    return list(db.scalars(query))
+
+
+def get_payment_or_404(db: Session, payment_id: int) -> SimulatedPayment:
+    payment = db.get(SimulatedPayment, payment_id)
+    if not payment:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Payment not found")
+    return payment
+
+
+def create_payment_intent(db: Session, data: SimulatedPaymentCreate) -> SimulatedPayment:
+    """Get-or-create by idempotency key -- a retried request never creates a second
+    payment intent."""
+    existing = db.scalar(select(SimulatedPayment).where(SimulatedPayment.idempotency_key == data.idempotency_key))
+    if existing:
+        return existing
+
+    payment = SimulatedPayment(
+        guest_id=data.guest_id,
+        amount=data.amount,
+        currency=data.currency,
+        idempotency_key=data.idempotency_key,
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+    return payment
+
+
+def confirm_payment(db: Session, payment: SimulatedPayment, data: PaymentConfirm, admin: AdminUser) -> SimulatedPayment:
+    """Idempotent: replaying a confirm call against an already-SUCCEEDED payment is a
+    no-op that returns the existing state instead of allocating a second time."""
+    if payment.status == "SUCCEEDED":
+        return payment
+    if payment.status == "FAILED":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Payment already failed")
+
+    requested_total = _round2(sum(a.amount for a in data.allocations))
+    if requested_total != _round2(payment.amount):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Allocations must sum to the full payment amount")
+
+    obligations = []
+    for allocation in data.allocations:
+        obligation = db.get(Obligation, allocation.obligation_id)
+        if not obligation:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"Obligation {allocation.obligation_id} not found")
+        db.add(PaymentAllocation(payment_id=payment.id, obligation_id=obligation.id, amount_allocated=allocation.amount))
+        obligations.append(obligation)
+
+    db.flush()
+    for obligation in obligations:
+        db.refresh(obligation)
+        recompute_obligation_status(db, obligation)
+
+        if obligation.obligation_type == "DEPOSIT" and obligation.status == "PAID" and not obligation.deposit_record:
+            db.add(DepositRecord(obligation_id=obligation.id, held_amount=obligation.amount))
+
+    payment.status = "SUCCEEDED"
+    payment.confirmed_at = datetime.now(timezone.utc)
+    db.commit()
+
+    # Auto-generate the next recurring rent obligation once a period's rent clears --
+    # the primary trigger for recurring billing in the absence of a scheduler. This is
+    # a best-effort convenience step: an ownership mismatch (e.g. a super_admin's own
+    # payment action touching another provider's occupancy) must not undo an already-
+    # committed successful payment, so it never propagates a failure back to the caller.
+    for obligation in obligations:
+        if obligation.obligation_type == "RENT" and obligation.status == "PAID" and obligation.occupancy_id:
+            db.refresh(obligation)
+            try:
+                generate_next_rent_obligation(db, obligation.occupancy, admin)
+            except HTTPException:
+                pass
+
+    db.refresh(payment)
+    return payment
+
+
+def list_deposit_records(db: Session, admin: AdminUser) -> list[DepositRecord]:
+    query = select(DepositRecord)
+    if admin.role != "super_admin":
+        query = query.where(DepositRecord.obligation_id.in_(_owned_obligation_ids(db, admin)))
+    return list(db.scalars(query))
+
+
+def get_deposit_record_or_404(db: Session, deposit_id: int) -> DepositRecord:
+    record = db.get(DepositRecord, deposit_id)
+    if not record:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Deposit record not found")
+    return record
+
+
+def release_deposit(db: Session, record: DepositRecord, admin: AdminUser, data: DepositRelease) -> DepositRecord:
+    party_id = record.obligation.agreement.offer.listing.room.property.owner_party_id if record.obligation.agreement \
+        else record.obligation.occupancy.listing.room.property.owner_party_id
+    assert_provider_access(db, admin, party_id, roles=("provider_finance", "provider_owner_admin"))
+
+    remaining = _round2(record.held_amount) - _round2(record.released_amount)
+    if data.amount > remaining:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cannot release more than the remaining held amount")
+
+    record.released_amount = _round2(record.released_amount) + data.amount
+    record.released_at = datetime.now(timezone.utc)
+    record.notes = data.notes or record.notes
+    record.status = "RELEASED" if _round2(record.released_amount) >= _round2(record.held_amount) else "PARTIALLY_RELEASED"
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+def forfeit_deposit(db: Session, record: DepositRecord, admin: AdminUser) -> DepositRecord:
+    party_id = record.obligation.agreement.offer.listing.room.property.owner_party_id if record.obligation.agreement \
+        else record.obligation.occupancy.listing.room.property.owner_party_id
+    assert_provider_access(db, admin, party_id, roles=("provider_finance", "provider_owner_admin"))
+
+    record.status = "FORFEITED"
+    record.released_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+def run_payout(db: Session, party: Party, admin: AdminUser, period_key: str) -> PayoutRecord:
+    assert_provider_access(db, admin, party.id, roles=("provider_finance", "provider_owner_admin"))
+
+    candidates = db.scalars(
+        select(Obligation)
+        .where(Obligation.obligation_type == "RENT", Obligation.status == "PAID", Obligation.payout_id.is_(None))
+        .with_for_update()
+    ).all()
+
+    def _room_for(obligation: Obligation):
+        if obligation.agreement:
+            return obligation.agreement.offer.listing.room
+        return obligation.occupancy.room
+
+    matched = [o for o in candidates if _room_for(o).property.owner_party_id == party.id]
+    gross = _round2(sum(o.amount for o in matched))
+    fee = _round2(gross * PLATFORM_FEE_RATE)
+    net = _round2(gross - fee)
+
+    held_reason = ""
+    for obligation in matched:
+        room = _room_for(obligation)
+        if not get_valid_authority_for_room(db, room.id):
+            held_reason = "One or more rooms no longer have a verified authority record"
+            break
+
+    payout = PayoutRecord(
+        party_id=party.id,
+        period_key=period_key,
+        amount=net,
+        status="HELD" if held_reason else "PAID",
+        hold_reason=held_reason,
+    )
+    db.add(payout)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "A payout has already been run for this provider and period")
+
+    if not held_reason:
+        payout.paid_at = datetime.now(timezone.utc)
+        for obligation in matched:
+            obligation.payout_id = payout.id
+
+    db.commit()
+    db.refresh(payout)
+    return payout
+
+
+def list_payouts_for(db: Session, admin: AdminUser) -> list[PayoutRecord]:
+    query = select(PayoutRecord).order_by(PayoutRecord.created_at.desc())
+    if admin.role != "super_admin":
+        party = get_or_create_default_party(db, admin)
+        query = query.where(PayoutRecord.party_id == party.id)
+    return list(db.scalars(query))
+
+
+def list_refund_requests(db: Session, admin: AdminUser) -> list[RefundRequest]:
+    query = select(RefundRequest).order_by(RefundRequest.created_at.desc())
+    if admin.role != "super_admin":
+        query = query.where(RefundRequest.obligation_id.in_(_owned_obligation_ids(db, admin)))
+    return list(db.scalars(query))
+
+
+def get_refund_or_404(db: Session, refund_id: int) -> RefundRequest:
+    refund = db.get(RefundRequest, refund_id)
+    if not refund:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Refund request not found")
+    return refund
+
+
+def request_refund(db: Session, data: RefundRequestCreate, admin: AdminUser) -> RefundRequest:
+    payment = db.get(SimulatedPayment, data.payment_id)
+    obligation = db.get(Obligation, data.obligation_id)
+    if not payment or not obligation:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Payment or obligation not found")
+
+    refund = RefundRequest(
+        payment_id=data.payment_id,
+        obligation_id=data.obligation_id,
+        amount=data.amount,
+        reason=data.reason,
+        requested_by_admin_id=admin.id,
+    )
+    db.add(refund)
+    db.commit()
+    db.refresh(refund)
+    return refund
+
+
+def decide_refund(db: Session, refund: RefundRequest, admin: AdminUser, data: RefundDecide) -> RefundRequest:
+    """Approving is completing -- there's no separate money-movement step in a
+    simulated system. Completing a refund creates a reversing PaymentAllocation and
+    recomputes the obligation's status, so the refund actually affects the ledger."""
+    if refund.status != "REQUESTED":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Refund has already been decided")
+
+    if not data.approve:
+        refund.status = "REJECTED"
+        refund.decided_by_admin_id = admin.id
+        refund.decided_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(refund)
+        return refund
+
+    obligation = refund.obligation
+    db.add(PaymentAllocation(payment_id=refund.payment_id, obligation_id=obligation.id, amount_allocated=-refund.amount))
+    db.flush()
+    db.refresh(obligation)
+    recompute_obligation_status(db, obligation)
+
+    refund.status = "COMPLETED"
+    refund.decided_by_admin_id = admin.id
+    refund.decided_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(refund)
+    return refund
+
+
+def list_dispute_cases(db: Session, admin: AdminUser) -> list[DisputeCase]:
+    query = select(DisputeCase).order_by(DisputeCase.opened_at.desc())
+    if admin.role != "super_admin":
+        query = query.where(
+            or_(
+                DisputeCase.occupancy_id.in_(_owned_occupancy_ids(db, admin)),
+                DisputeCase.payment_id.in_(_owned_payment_ids(db, admin)),
+            )
+        )
+    return list(db.scalars(query))
+
+
+def get_dispute_or_404(db: Session, dispute_id: int) -> DisputeCase:
+    dispute = db.get(DisputeCase, dispute_id)
+    if not dispute:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Dispute case not found")
+    return dispute
+
+
+def open_dispute(db: Session, data: DisputeCreate, admin: AdminUser) -> DisputeCase:
+    dispute = DisputeCase(
+        payment_id=data.payment_id,
+        occupancy_id=data.occupancy_id,
+        category=data.category,
+        description=data.description,
+    )
+    db.add(dispute)
+    db.commit()
+    db.refresh(dispute)
+    return dispute
+
+
+def resolve_dispute(db: Session, dispute: DisputeCase, admin: AdminUser, data: DisputeResolve) -> DisputeCase:
+    if data.status not in ("RESOLVED", "REJECTED"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "status must be RESOLVED or REJECTED")
+
+    dispute.status = data.status
+    dispute.resolution_notes = data.resolution_notes
+    dispute.resolved_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(dispute)
+    return dispute
+
+
+def run_reconciliation(db: Session, admin: AdminUser) -> ReconciliationRun:
+    occupancy_paid = _round2(
+        sum(o.amount for o in db.scalars(select(Obligation).where(Obligation.money_plane == "OCCUPANCY", Obligation.status == "PAID")))
+    )
+    safeguarded_paid = _round2(
+        sum(o.amount for o in db.scalars(select(Obligation).where(Obligation.money_plane == "SAFEGUARDED", Obligation.status == "PAID")))
+    )
+    total_payments = _round2(sum(p.amount for p in db.scalars(select(SimulatedPayment).where(SimulatedPayment.status == "SUCCEEDED"))))
+    total_allocated = _round2(sum(a.amount_allocated for a in db.scalars(select(PaymentAllocation))))
+    total_payouts = _round2(sum(p.amount for p in db.scalars(select(PayoutRecord).where(PayoutRecord.status == "PAID"))))
+    total_refunds = _round2(sum(r.amount for r in db.scalars(select(RefundRequest).where(RefundRequest.status == "COMPLETED"))))
+
+    mismatches = []
+    if abs(total_allocated - (total_payments - total_refunds)) > 0.01:
+        mismatches.append(
+            f"Allocated total ({total_allocated}) does not match payments minus refunds ({_round2(total_payments - total_refunds)})"
+        )
+
+    run = ReconciliationRun(
+        totals={
+            "occupancyPlanePaid": occupancy_paid,
+            "safeguardedPlanePaid": safeguarded_paid,
+            "totalPayments": total_payments,
+            "totalAllocated": total_allocated,
+            "totalPayouts": total_payouts,
+            "totalRefunds": total_refunds,
+        },
+        mismatches=mismatches,
+        status="DISCREPANCIES_FOUND" if mismatches else "CLEAN",
+    )
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+    return run
+
+
+def list_reconciliation_runs(db: Session) -> list[ReconciliationRun]:
+    return list(db.scalars(select(ReconciliationRun).order_by(ReconciliationRun.run_at.desc())))

@@ -1,10 +1,13 @@
 import { CreditCard, RefreshCcw, Wallet } from "lucide-react";
 import { StatCard } from "@/components/admin/StatCard";
 import { PaymentsTable } from "@/components/admin/PaymentsTable";
-import { payments } from "@/data/payments";
+import { apiFetch, requireSuperAdmin } from "@/lib/api";
+import { Payment } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
-export default function AdminPaymentsPage() {
+export default async function AdminPaymentsPage() {
+  await requireSuperAdmin();
+  const payments = await apiFetch<Payment[]>("/api/payments");
   const collected = payments.filter((p) => p.status === "paid").reduce((s, p) => s + p.amount, 0);
   const pending = payments.filter((p) => p.status === "unpaid").reduce((s, p) => s + p.amount, 0);
   const refunded = payments.filter((p) => p.status === "refunded").reduce((s, p) => s + p.amount, 0);

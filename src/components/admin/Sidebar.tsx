@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -7,26 +8,37 @@ import {
   CalendarRange,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   CreditCard,
+  DoorOpen,
   LayoutDashboard,
   LogOut,
   Settings,
+  ShieldCheck,
   Star,
   Users,
+  UsersRound,
+  Wallet,
   X,
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
-import { clearAdminAuth } from "@/lib/auth";
+import { getCurrentAdmin, logout } from "@/lib/auth";
+import { AdminRole } from "@/lib/types";
 
 const navItems = [
-  { href: "/", label: "Overview", icon: LayoutDashboard },
-  { href: "/bookings", label: "Bookings", icon: CalendarRange },
-  { href: "/properties", label: "Properties & Rooms", icon: BedDouble },
-  { href: "/guests", label: "Guests", icon: Users },
-  { href: "/payments", label: "Payments", icon: CreditCard },
-  { href: "/reviews", label: "Reviews", icon: Star },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/", label: "Overview", icon: LayoutDashboard, superAdminOnly: true },
+  { href: "/bookings", label: "Bookings", icon: CalendarRange, superAdminOnly: true },
+  { href: "/properties", label: "Properties & Rooms", icon: BedDouble, superAdminOnly: false },
+  { href: "/leasing", label: "Leasing", icon: ClipboardList, superAdminOnly: false },
+  { href: "/occupancy", label: "Occupancy", icon: DoorOpen, superAdminOnly: false },
+  { href: "/finance", label: "Finance", icon: Wallet, superAdminOnly: false },
+  { href: "/guests", label: "Guests", icon: Users, superAdminOnly: true },
+  { href: "/payments", label: "Payments", icon: CreditCard, superAdminOnly: true },
+  { href: "/reviews", label: "Reviews", icon: Star, superAdminOnly: true },
+  { href: "/trust-safety", label: "Trust & Safety", icon: ShieldCheck, superAdminOnly: true },
+  { href: "/team", label: "Team", icon: UsersRound, superAdminOnly: true },
+  { href: "/settings", label: "Settings", icon: Settings, superAdminOnly: false },
 ];
 
 export function Sidebar({
@@ -42,10 +54,18 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [role, setRole] = useState<AdminRole | null>(null);
 
-  function handleLogout() {
-    clearAdminAuth();
+  useEffect(() => {
+    getCurrentAdmin().then((admin) => setRole(admin?.role ?? null));
+  }, []);
+
+  const visibleNavItems = navItems.filter((item) => !item.superAdminOnly || role === "super_admin");
+
+  async function handleLogout() {
+    await logout();
     router.push("/login");
+    router.refresh();
   }
 
   return (
@@ -96,7 +116,7 @@ export function Sidebar({
         </div>
 
         <nav className="relative mt-2 flex-1 space-y-1 overflow-y-auto px-3">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
             return (

@@ -1,0 +1,71 @@
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from app.api.routes import (
+    admin_users,
+    analytics,
+    authority,
+    auth,
+    bookings,
+    finance,
+    guests,
+    leasing,
+    listings,
+    market_releases,
+    occupancy,
+    occupancy_classification,
+    payments,
+    properties,
+    public,
+    reviews,
+    room_passport,
+    search,
+    settings as settings_routes,
+    uploads,
+)
+from app.core.config import settings
+from app.core.correlation import correlation_id_middleware
+
+app = FastAPI(title="Zoiko Rooms API")
+
+app.middleware("http")(correlation_id_middleware)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
+
+app.include_router(auth.router)
+app.include_router(listings.router)
+app.include_router(bookings.router)
+app.include_router(guests.router)
+app.include_router(payments.router)
+app.include_router(reviews.router)
+app.include_router(analytics.router)
+app.include_router(settings_routes.router)
+app.include_router(admin_users.router)
+app.include_router(public.router)
+app.include_router(uploads.router)
+app.include_router(search.router)
+app.include_router(market_releases.router)
+app.include_router(properties.router)
+app.include_router(authority.router)
+app.include_router(room_passport.router)
+app.include_router(occupancy_classification.router)
+app.include_router(leasing.router)
+app.include_router(occupancy.router)
+app.include_router(finance.router)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

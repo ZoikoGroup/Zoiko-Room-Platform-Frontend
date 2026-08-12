@@ -1,27 +1,36 @@
-const AUTH_KEY = "zoiko_admin_auth";
+import { apiClientFetch } from "@/lib/api-client";
+import { AdminRole } from "@/lib/types";
 
-export function setAdminAuth(email: string) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(AUTH_KEY, JSON.stringify({ email, at: Date.now() }));
+export interface AdminProfile {
+  id: number;
+  email: string;
+  fullName: string;
+  phone: string;
+  role: AdminRole;
 }
 
-export function isAdminAuthed() {
-  if (typeof window === "undefined") return false;
-  return Boolean(window.localStorage.getItem(AUTH_KEY));
+export function login(email: string, password: string): Promise<AdminProfile> {
+  return apiClientFetch<AdminProfile>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
 }
 
-export function getAdminEmail() {
-  if (typeof window === "undefined") return "";
-  const raw = window.localStorage.getItem(AUTH_KEY);
-  if (!raw) return "";
+export function register(fullName: string, email: string, phone: string, password: string): Promise<{ message: string }> {
+  return apiClientFetch<{ message: string }>("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ fullName, email, phone, password }),
+  });
+}
+
+export async function logout(): Promise<void> {
+  await apiClientFetch("/api/auth/logout", { method: "POST" });
+}
+
+export async function getCurrentAdmin(): Promise<AdminProfile | null> {
   try {
-    return JSON.parse(raw).email ?? "";
+    return await apiClientFetch<AdminProfile>("/api/auth/me");
   } catch {
-    return "";
+    return null;
   }
-}
-
-export function clearAdminAuth() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(AUTH_KEY);
 }

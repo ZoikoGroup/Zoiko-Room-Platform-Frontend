@@ -3,9 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, ChevronDown, LogOut, Menu, Search, Settings, UserCircle2 } from "lucide-react";
-import { clearAdminAuth, getAdminEmail } from "@/lib/auth";
+import { Bell, BedDouble, CalendarRange, ChevronDown, Loader2, LogOut, Menu, Search, Settings, UserCircle2, Users } from "lucide-react";
+import { getCurrentAdmin, logout } from "@/lib/auth";
+import { apiClientFetch } from "@/lib/api-client";
+import { SearchResult } from "@/lib/types";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+
+const resultIcons: Record<SearchResult["type"], typeof BedDouble> = {
+  listing: BedDouble,
+  guest: Users,
+  booking: CalendarRange,
+};
 
 const notifications = [
   { id: 1, text: "New booking from Rohan Verma for Sunset Bay Villa", time: "5m ago" },
@@ -18,10 +26,15 @@ export function Topbar({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => voi
   const [email, setEmail] = useState("");
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setEmail(getAdminEmail());
+    getCurrentAdmin().then((admin) => setEmail(admin?.email ?? ""));
   }, []);
 
   useEffect(() => {
@@ -30,14 +43,44 @@ export function Topbar({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => voi
         setNotifOpen(false);
         setProfileOpen(false);
       }
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
     }
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
   }, []);
 
-  function handleLogout() {
-    clearAdminAuth();
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const timeout = setTimeout(() => {
+      apiClientFetch<SearchResult[]>(`/api/search?q=${encodeURIComponent(trimmed)}`)
+        .then((results) => {
+          setSearchResults(results);
+          setSearchOpen(true);
+        })
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
+  function handleSelectResult(result: SearchResult) {
+    setSearchOpen(false);
+    setSearchQuery("");
+    router.push(result.href);
+  }
+
+  async function handleLogout() {
+    await logout();
     router.push("/login");
+    router.refresh();
   }
 
   return (
@@ -50,12 +93,52 @@ export function Topbar({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => voi
           <Menu className="h-5 w-5" />
         </button>
 
-        <div className="hidden items-center gap-2 rounded-full bg-slate-100 px-4 py-2 sm:flex dark:bg-white/5">
-          <Search className="h-4 w-4 text-slate-400" />
-          <input
-            placeholder="Search bookings, guests, properties..."
-            className="w-56 bg-transparent text-sm text-slate-600 outline-none placeholder:text-slate-400 lg:w-72 dark:text-slate-200"
-          />
+        <div ref={searchRef} className="relative hidden sm:block">
+          <div className="flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 dark:bg-white/5">
+            {searching ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-400" />
+            ) : (
+              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+            )}
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
+              placeholder="Search bookings, guests, properties..."
+              className="w-56 bg-transparent text-sm text-slate-600 outline-none placeholder:text-slate-400 lg:w-72 dark:text-slate-200"
+            />
+          </div>
+
+          {searchOpen && (
+            <div className="animate-scale-in absolute left-0 top-full mt-2 w-full min-w-[320px] origin-top rounded-2xl bg-white p-2 shadow-xl shadow-primary-900/15 ring-1 ring-slate-100 dark:bg-slate-800 dark:shadow-black/40 dark:ring-white/10">
+              {searchResults.length === 0 ? (
+                <p className="px-3 py-4 text-center text-sm text-slate-400">
+                  {searchQuery.trim().length < 2 ? "Keep typing to search..." : "No matches found."}
+                </p>
+              ) : (
+                searchResults.map((result) => {
+                  const Icon = resultIcons[result.type];
+                  return (
+                    <button
+                      key={`${result.type}-${result.id}`}
+                      onClick={() => handleSelectResult(result)}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-primary-50 dark:hover:bg-white/10"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-slate-700 dark:text-slate-200">
+                          {result.title}
+                        </span>
+                        <span className="block truncate text-xs text-slate-400">{result.subtitle}</span>
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
       </div>
 

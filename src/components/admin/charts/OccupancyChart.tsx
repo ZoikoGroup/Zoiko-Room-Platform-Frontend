@@ -1,10 +1,14 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { occupancyByCity } from "@/data/analytics";
 import { useTheme } from "@/hooks/useTheme";
 
-export function OccupancyChart() {
+export interface OccupancyByCityPoint {
+  city: string;
+  occupancy: number;
+}
+
+export function OccupancyChart({ data: occupancyByCity }: { data: OccupancyByCityPoint[] }) {
   const isDark = useTheme() === "dark";
 
   return (
