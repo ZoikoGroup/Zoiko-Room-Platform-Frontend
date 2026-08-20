@@ -317,8 +317,8 @@ def seed_leasing_pipeline(db, admin: AdminUser) -> None:
 
     agreement = leasing_crud.create_agreement(db, offer, admin)
     leasing_crud.send_agreement(db, agreement, admin)
-    leasing_crud.sign_agreement(db, agreement, "provider")
-    agreement = leasing_crud.sign_agreement(db, agreement, "renter")
+    leasing_crud.sign_agreement(db, agreement, "provider", admin)
+    agreement = leasing_crud.sign_agreement(db, agreement, "renter", admin)
 
     rent_obligation = next(o for o in agreement.obligations if o.obligation_type == "RENT")
     deposit_obligation = next(o for o in agreement.obligations if o.obligation_type == "DEPOSIT")

@@ -58,7 +58,7 @@ class ListingRead(ListingBase):
     slug: str
     rating: float
     review_count: int
-    owner_id: int
+    owner_id: int | None
     state: str
     market_release_id: int | None = None
     contact_name: str = ""

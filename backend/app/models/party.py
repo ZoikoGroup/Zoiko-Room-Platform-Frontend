@@ -20,3 +20,8 @@ class Party(Base):
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="party", cascade="all, delete-orphan")
     properties: Mapped[list["Property"]] = relationship(back_populates="owner_party")
+    identity_verifications: Mapped[list["IdentityVerification"]] = relationship(back_populates="party", cascade="all, delete-orphan")
+    user_accounts: Mapped[list["UserAccount"]] = relationship(back_populates="party", cascade="all, delete-orphan")
+    listings: Mapped[list["Listing"]] = relationship(back_populates="party", cascade="all, delete-orphan")
+
+

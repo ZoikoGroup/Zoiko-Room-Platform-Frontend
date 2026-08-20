@@ -90,3 +90,66 @@ class ApplicationRead(CamelModel):
     updated_at: datetime
     decisions: list[ApplicationDecisionRead] = []
     offer: OfferRead | None = None
+
+
+class UserApplicationSubmitRequest(CamelModel):
+    """User submitting a rental application."""
+
+    listing_id: str
+    message: str = ""
+    desired_move_in: date | None = None
+
+
+class UserApplicationRead(CamelModel):
+    """User-facing application view."""
+
+    id: int
+    listing_id: str
+    status: str
+    message: str
+    desired_move_in: date | None
+    submitted_at: datetime
+    updated_at: datetime
+
+
+class UserOccupancyRead(CamelModel):
+    """User-facing occupancy/rental view."""
+
+    id: int
+    listing_id: str
+    room_id: int
+    status: str
+    move_in_date: date | None
+    expected_end_date: date | None
+    move_out_date: date | None
+    created_at: datetime
+    ended_at: datetime | None
+
+
+class SubletRequestCreate(CamelModel):
+    """User submitting a sublet request."""
+
+    occupancy_id: int
+    proposed_renter_party_id: int
+    authority_evidence_ref: str = ""
+
+
+class SubletRequestRead(CamelModel):
+    """Read view for sublet request."""
+
+    id: int
+    current_occupancy_id: int
+    proposed_renter_party_id: int
+    status: str
+    authority_evidence_ref: str
+    admin_decision: str
+    admin_notes: str
+    decided_by_admin_id: int | None
+    created_at: datetime
+    decided_at: datetime | None
+
+
+class SubletRequestDecision(CamelModel):
+    """Optional review notes recorded with a sublet approval or rejection."""
+
+    notes: str = ""

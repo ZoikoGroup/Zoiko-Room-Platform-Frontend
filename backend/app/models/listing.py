@@ -36,7 +36,12 @@ class Listing(Base):
     tags: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     description: Mapped[str] = mapped_column(String(2000), default="")
     featured: Mapped[bool] = mapped_column(Boolean, default=False)
-    owner_id: Mapped[int] = mapped_column(ForeignKey("admin_users.id"), nullable=False)
+    # Admin-created listings retain their admin owner. USER-hosted listings are
+    # owned by their Party and deliberately do not require an AdminUser account.
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("admin_users.id"), nullable=True)
+    party_id: Mapped[int | None] = mapped_column(
+        ForeignKey("parties.id", ondelete="CASCADE"), nullable=True, index=True
+    )
 
     room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id"), nullable=True)
     market_release_id: Mapped[int | None] = mapped_column(ForeignKey("market_releases.id"), nullable=True)
@@ -50,6 +55,7 @@ class Listing(Base):
     contact_email: Mapped[str] = mapped_column(String(255), default="")
 
     owner: Mapped["AdminUser"] = relationship(back_populates="listings")
+    party: Mapped["Party"] = relationship(back_populates="listings")
     room: Mapped["Room"] = relationship(back_populates="listings")
     market_release: Mapped["MarketRelease"] = relationship(back_populates="listings")
     bookings: Mapped[list["Booking"]] = relationship(back_populates="listing")

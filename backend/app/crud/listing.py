@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.crud.authority import get_valid_authority_for_room
 from app.crud.ids import new_id, slugify
+from app.crud.identity_verification import get_verified_identity_for_party
 from app.crud.occupancy_classification import get_classification_for_room
 from app.models.admin_user import AdminUser
 from app.models.listing import Listing
@@ -72,9 +73,9 @@ def to_public_listing_read(listing: Listing) -> PublicListingRead:
         featured=listing.featured,
         room_id=listing.room_id,
         min_stay_nights=listing.min_stay_nights,
-        owner_name=listing.contact_name or listing.owner.full_name,
-        owner_email=listing.contact_email or listing.owner.email,
-        owner_phone=listing.contact_phone or listing.owner.phone,
+        owner_name=listing.contact_name or (listing.owner.full_name if listing.owner else "Host"),
+        owner_email=listing.contact_email or (listing.owner.email if listing.owner else ""),
+        owner_phone=listing.contact_phone or (listing.owner.phone if listing.owner else ""),
     )
 
 
@@ -96,6 +97,37 @@ def create_listing(db: Session, data: ListingCreate, owner: AdminUser) -> Listin
     db.commit()
     db.refresh(listing)
     return listing
+
+
+def create_listing_for_party(db: Session, data: ListingCreate, party_id: int) -> Listing:
+    """Create a USER-hosted draft listing without requiring an AdminUser."""
+    if data.min_stay_nights < 30:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Minimum stay must be at least 30 nights")
+    if data.room_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "A hosted listing must be linked to one of your rooms")
+
+    assert_party_owns_room(db, data.room_id, party_id)
+    listing = Listing(
+        id=new_id("L"), slug=slugify(data.name), rating=4.5, review_count=0,
+        owner_id=None, party_id=party_id, state="DRAFT",
+        market_release_id=_resolve_market_release_id_for_room(db, data.room_id),
+        **data.model_dump(),
+    )
+    db.add(listing)
+    db.commit()
+    db.refresh(listing)
+    return listing
+
+
+def assert_party_owns_listing(listing: Listing, party_id: int) -> None:
+    if listing.party_id != party_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only manage listings owned by your party")
+
+
+def assert_party_owns_room(db: Session, room_id: int, party_id: int) -> None:
+    room = db.get(Room, room_id)
+    if not room or room.property.owner_party_id != party_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only list rooms owned by your party")
 
 
 def update_listing(db: Session, listing: Listing, data: ListingUpdate) -> Listing:
@@ -188,6 +220,11 @@ def check_publish_eligibility(db: Session, listing: Listing) -> list[str]:
     classification = get_classification_for_room(db, listing.room_id)
     if not classification or classification.review_state in ("UNKNOWN", "UNSUPPORTED"):
         reasons.append("Occupancy classification is missing or unresolved")
+
+    provider_party_id = listing.room.property.owner_party_id
+    identity = get_verified_identity_for_party(db, provider_party_id)
+    if not identity:
+        reasons.append("Provider identity verification is not approved")
 
     return reasons
 
