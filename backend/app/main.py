@@ -12,6 +12,7 @@ from app.api.routes import (
     bookings,
     finance,
     guests,
+    identity_verification,
     leasing,
     listings,
     market_releases,
@@ -25,6 +26,11 @@ from app.api.routes import (
     search,
     settings as settings_routes,
     uploads,
+    user_auth,
+    user_hosting,
+    user_identity,
+    user_payments,
+    user_rentals,
 )
 from app.core.config import settings
 from app.core.correlation import correlation_id_middleware
@@ -45,6 +51,11 @@ Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
 
 app.include_router(auth.router)
+app.include_router(user_auth.router)
+app.include_router(user_identity.router)
+app.include_router(user_payments.router)
+app.include_router(user_rentals.router)
+app.include_router(user_hosting.router)
 app.include_router(listings.router)
 app.include_router(bookings.router)
 app.include_router(guests.router)
@@ -59,6 +70,7 @@ app.include_router(search.router)
 app.include_router(market_releases.router)
 app.include_router(properties.router)
 app.include_router(authority.router)
+app.include_router(identity_verification.router)
 app.include_router(room_passport.router)
 app.include_router(occupancy_classification.router)
 app.include_router(leasing.router)

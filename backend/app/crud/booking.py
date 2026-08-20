@@ -66,6 +66,16 @@ def create_booking(db: Session, data: BookingCreate) -> BookingRead:
     if data.check_out <= data.check_in:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Check-out date must be after check-in date")
 
+    nights = (data.check_out - data.check_in).days
+    if nights < 30:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Minimum stay must be at least 30 nights")
+
+    listing = db.get(Listing, data.listing_id)
+    if not listing:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Listing not found")
+    if listing.state != "PUBLISHED":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Listing is not currently available for booking")
+
     guest = _resolve_guest(db, data)
     _assert_available(db, data.listing_id, data.check_in, data.check_out)
 

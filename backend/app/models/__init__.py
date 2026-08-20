@@ -3,6 +3,8 @@ from app.models.audit import AuditEvent
 from app.models.authority_record import AuthorityRecord
 from app.models.booking import Booking
 from app.models.domain_event import DomainEvent
+from app.models.user_account import UserAccount
+from app.models.sublet_request import SubletRequest
 from app.models.finance import (
     DepositRecord,
     DisputeCase,
@@ -26,10 +28,13 @@ from app.models.property import Property
 from app.models.review import Review
 from app.models.room import Room
 from app.models.room_passport import RoomPassportClaim, RoomPassportSnapshot
+from app.models.identity_verification import IdentityVerification
 
 __all__ = [
     "AdminUser",
     "AdminSettings",
+    "UserAccount",
+    "SubletRequest",
     "Listing",
     "Guest",
     "Booking",
@@ -60,4 +65,5 @@ __all__ = [
     "RefundRequest",
     "DisputeCase",
     "ReconciliationRun",
+    "IdentityVerification",
 ]

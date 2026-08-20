@@ -65,6 +65,49 @@ class AuthorityRecordRead(CamelModel):
     created_at: datetime
 
 
+class IdentityVerificationCreate(CamelModel):
+    party_id: int | None = None
+    document_type: str
+    encrypted_reference: str
+    evidence_ref: str = ""
+
+
+class IdentityVerificationRead(CamelModel):
+    id: int
+    party_id: int
+    document_type: str
+    encrypted_reference: str
+    evidence_ref: str
+    verified_at: datetime | None
+    expires_at: datetime | None
+    verifier_admin_id: int | None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class IdentityVerificationSubmitRequest(CamelModel):
+    """User-facing identity verification submission."""
+
+    document_type: str
+    encrypted_reference: str
+    evidence_ref: str = ""
+
+
+class IdentityVerificationUserRead(CamelModel):
+    """User-facing identity verification response."""
+
+    id: int
+    document_type: str
+    evidence_ref: str
+    status: str
+    verified_at: datetime | None
+    expires_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    verifier_notes: str = ""
+
+
 class RoomPassportClaimCreate(CamelModel):
     claim_type: str
     value: str

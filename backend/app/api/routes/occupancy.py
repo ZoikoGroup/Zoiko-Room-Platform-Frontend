@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_admin
+from app.api.deps import get_current_admin, require_super_admin
 from app.core.correlation import get_correlation_id
 from app.crud import finance as finance_crud
 from app.crud import leasing as leasing_crud
 from app.crud import occupancy as crud
+from app.crud import sublet as sublet_crud
 from app.crud.audit import log_audit_event
 from app.crud.eligibility import check_move_in_eligibility
 from app.crud.events import emit_event
@@ -13,6 +14,7 @@ from app.db.session import get_db
 from app.models.admin_user import AdminUser
 from app.schemas.finance import ObligationRead
 from app.schemas.occupancy import OccupancyRead
+from app.schemas.leasing import SubletRequestDecision, SubletRequestRead
 
 router = APIRouter(prefix="/api/occupancy", tags=["occupancy"], dependencies=[Depends(get_current_admin)])
 
@@ -79,3 +81,94 @@ def post_end_occupancy(
     emit_event(db, "occupancy.ended", "occupancy", str(occupancy_id), {})
     db.commit()
     return crud.to_occupancy_read(updated)
+
+
+@router.get("/sublet-requests", response_model=list[SubletRequestRead], dependencies=[Depends(require_super_admin)])
+def list_pending_sublet_requests(
+    admin: AdminUser = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """List all pending sublet requests for super admin review."""
+    sublet_requests = sublet_crud.list_pending_sublet_requests(db, admin)
+    return [
+        SubletRequestRead(
+            id=sr.id,
+            current_occupancy_id=sr.current_occupancy_id,
+            proposed_renter_party_id=sr.proposed_renter_party_id,
+            status=sr.status,
+            authority_evidence_ref=sr.authority_evidence_ref,
+            admin_decision=sr.admin_decision,
+            admin_notes=sr.admin_notes,
+            decided_by_admin_id=sr.decided_by_admin_id,
+            created_at=sr.created_at,
+            decided_at=sr.decided_at,
+        )
+        for sr in sublet_requests
+    ]
+
+
+@router.post("/sublet-requests/{sublet_request_id}/approve", response_model=SubletRequestRead, dependencies=[Depends(require_super_admin)])
+def approve_sublet_request(
+    sublet_request_id: int,
+    request: Request,
+    payload: SubletRequestDecision | None = None,
+    admin: AdminUser = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Super admin approves a sublet request."""
+    sublet_request = sublet_crud.get_sublet_request(db, sublet_request_id)
+    if not sublet_request:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Sublet request not found")
+
+    approved = sublet_crud.approve_sublet_request(db, sublet_request, admin, payload.notes if payload else "")
+    log_audit_event(db, admin, "sublet_request.approve", "sublet_request", str(sublet_request_id), get_correlation_id(request))
+    emit_event(
+        db, "sublet_request.approved", "sublet_request", str(sublet_request_id),
+        {"occupancyId": approved.current_occupancy_id, "proposedRenterPartyId": approved.proposed_renter_party_id},
+    )
+    db.commit()
+
+    return SubletRequestRead(
+        id=approved.id,
+        current_occupancy_id=approved.current_occupancy_id,
+        proposed_renter_party_id=approved.proposed_renter_party_id,
+        status=approved.status,
+        authority_evidence_ref=approved.authority_evidence_ref,
+        admin_decision=approved.admin_decision,
+        admin_notes=approved.admin_notes,
+        decided_by_admin_id=approved.decided_by_admin_id,
+        created_at=approved.created_at,
+        decided_at=approved.decided_at,
+    )
+
+
+@router.post("/sublet-requests/{sublet_request_id}/reject", response_model=SubletRequestRead, dependencies=[Depends(require_super_admin)])
+def reject_sublet_request(
+    sublet_request_id: int,
+    request: Request,
+    payload: SubletRequestDecision | None = None,
+    admin: AdminUser = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
+    """Super admin rejects a sublet request."""
+    sublet_request = sublet_crud.get_sublet_request(db, sublet_request_id)
+    if not sublet_request:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Sublet request not found")
+
+    rejected = sublet_crud.reject_sublet_request(db, sublet_request, admin, payload.notes if payload else "")
+    log_audit_event(db, admin, "sublet_request.reject", "sublet_request", str(sublet_request_id), get_correlation_id(request))
+    emit_event(db, "sublet_request.rejected", "sublet_request", str(sublet_request_id), {"occupancyId": rejected.current_occupancy_id})
+    db.commit()
+
+    return SubletRequestRead(
+        id=rejected.id,
+        current_occupancy_id=rejected.current_occupancy_id,
+        proposed_renter_party_id=rejected.proposed_renter_party_id,
+        status=rejected.status,
+        authority_evidence_ref=rejected.authority_evidence_ref,
+        admin_decision=rejected.admin_decision,
+        admin_notes=rejected.admin_notes,
+        decided_by_admin_id=rejected.decided_by_admin_id,
+        created_at=rejected.created_at,
+        decided_at=rejected.decided_at,
+    )

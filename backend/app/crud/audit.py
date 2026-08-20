@@ -6,7 +6,7 @@ from app.models.audit import AuditEvent
 
 def log_audit_event(
     db: Session,
-    actor: AdminUser,
+    actor: AdminUser | None,
     action: str,
     resource_type: str,
     resource_id: str,
@@ -14,8 +14,8 @@ def log_audit_event(
     reason: str = "",
 ) -> AuditEvent:
     event = AuditEvent(
-        actor_admin_id=actor.id,
-        role=actor.role,
+        actor_admin_id=actor.id if actor else None,
+        role=actor.role if actor else "user",
         action=action,
         resource_type=resource_type,
         resource_id=resource_id,

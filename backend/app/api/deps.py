@@ -5,10 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.crud.admin import get_admin_by_email
+from app.crud.user import get_user_by_email
 from app.db.session import get_db
 from app.models.admin_user import AdminUser
+from app.models.user_account import UserAccount
 
 COOKIE_NAME = "zoiko_admin_token"
+USER_COOKIE_NAME = "zoiko_user_token"
 
 
 def get_current_admin(
@@ -31,3 +34,20 @@ def require_super_admin(admin: AdminUser = Depends(get_current_admin)) -> AdminU
     if admin.role != "super_admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super admin access required")
     return admin
+
+
+def get_current_user(
+    zoiko_user_token: str | None = Cookie(default=None, alias=USER_COOKIE_NAME),
+    db: Session = Depends(get_db),
+) -> UserAccount:
+    unauthorized = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    if not zoiko_user_token:
+        raise unauthorized
+    email = decode_access_token(zoiko_user_token)
+    if not email:
+        raise unauthorized
+    user = get_user_by_email(db, email)
+    if not user or not user.is_active:
+        raise unauthorized
+    return user
+
