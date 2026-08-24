@@ -39,3 +39,16 @@ class UserPasswordChangeRequest(CamelModel):
 class UserProfileUpdateRequest(CamelModel):
     full_name: str
     phone: str = ""
+
+
+class ForgotPasswordRequest(CamelModel):
+    email: str
+
+
+class ForgotPasswordResponse(CamelModel):
+    message: str
+
+
+class ResetPasswordRequest(CamelModel):
+    token: str
+    new_password: str

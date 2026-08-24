@@ -15,14 +15,24 @@ def verify_password(password: str, hashed: str) -> bool:
 
 
 def create_access_token(subject: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
-    payload = {"sub": subject, "exp": expire}
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(minutes=settings.jwt_expire_minutes)
+    # "iat" (issued-at, as an int epoch so decoding never depends on jose's
+    # datetime-claim handling) lets USER sessions be invalidated after a password
+    # reset without a server-side token blacklist -- see get_current_user. Admin
+    # tokens carry it too since the two auth flows share this helper, but the
+    # admin decode path below only ever reads "sub", so it has no effect there.
+    payload = {"sub": subject, "iat": int(now.timestamp()), "exp": expire}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-def decode_access_token(token: str) -> str | None:
+def decode_access_token_claims(token: str) -> dict | None:
     try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-        return payload.get("sub")
+        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except JWTError:
         return None
+
+
+def decode_access_token(token: str) -> str | None:
+    claims = decode_access_token_claims(token)
+    return claims.get("sub") if claims else None

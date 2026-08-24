@@ -18,6 +18,14 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     max_upload_size_mb: int = 8
 
+    # USER identity documents are never served through the public /uploads static
+    # route -- they live in their own directory that main.py never mounts.
+    identity_upload_dir: str = "secure_uploads/identity"
+    identity_document_max_size_mb: int = 10
+
+    frontend_url: str = "http://localhost:3000"
+    password_reset_token_expire_minutes: int = 30
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

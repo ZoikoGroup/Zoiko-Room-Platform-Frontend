@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.party import get_or_create_default_party
 from app.models.admin_user import AdminUser
-from app.models.identity_verification import IdentityVerification, DOCUMENT_TYPES, IDENTITY_STATUSES
+from app.models.identity_verification import DOCUMENT_CATEGORY_BY_TYPE, IdentityVerification, DOCUMENT_TYPES, IDENTITY_STATUSES
 from app.models.party import Party
 from app.models.user_account import UserAccount
 from app.schemas.marketplace import IdentityVerificationCreate
@@ -14,13 +14,20 @@ from app.schemas.marketplace import IdentityVerificationCreate
 IDENTITY_VERIFICATION_VALIDITY_DAYS = 365
 
 
-def list_identity_verifications(db: Session, admin: AdminUser, party_id: int | None = None) -> list[IdentityVerification]:
-    query = select(IdentityVerification).order_by(IdentityVerification.id)
+def list_identity_verifications(
+    db: Session,
+    admin: AdminUser,
+    party_id: int | None = None,
+    status: str | None = None,
+) -> list[IdentityVerification]:
+    query = select(IdentityVerification).order_by(IdentityVerification.id.desc())
     if admin.role != "super_admin":
         party = get_or_create_default_party(db, admin)
         query = query.where(IdentityVerification.party_id == party.id)
     elif party_id is not None:
         query = query.where(IdentityVerification.party_id == party_id)
+    if status is not None:
+        query = query.where(IdentityVerification.status == status)
     return list(db.scalars(query))
 
 
@@ -46,6 +53,7 @@ def submit_identity_verification(db: Session, admin: AdminUser, data: IdentityVe
     record = IdentityVerification(
         party_id=party.id,
         document_type=data.document_type,
+        document_category=DOCUMENT_CATEGORY_BY_TYPE.get(data.document_type, "identity"),
         encrypted_reference=data.encrypted_reference,
         evidence_ref=data.evidence_ref,
         status="pending",
@@ -70,12 +78,15 @@ def verify_identity_verification(db: Session, record: IdentityVerification, veri
     return record
 
 
-def reject_identity_verification(db: Session, record: IdentityVerification, verifier: AdminUser) -> IdentityVerification:
+def reject_identity_verification(
+    db: Session, record: IdentityVerification, verifier: AdminUser, notes: str = ""
+) -> IdentityVerification:
     if verifier.role != "super_admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Super admin access required")
     now = datetime.now(timezone.utc)
     record.status = "rejected"
     record.verifier_admin_id = verifier.id
+    record.verifier_notes = notes
     record.updated_at = now
     db.commit()
     db.refresh(record)
@@ -95,20 +106,39 @@ def get_verified_identity_for_party(db: Session, party_id: int) -> IdentityVerif
     )
 
 
-def submit_identity_verification_for_user(db: Session, user_account: "UserAccount", data: IdentityVerificationCreate) -> IdentityVerification:
-    """User submits their own identity verification for PENDING approval."""
-    if data.document_type not in DOCUMENT_TYPES:
+def submit_identity_verification_for_user(
+    db: Session,
+    user_account: "UserAccount",
+    *,
+    document_type: str,
+    document_number: str,
+    custom_document_name: str,
+    stored_filename: str,
+    original_filename: str,
+    content_type: str,
+    file_size: int,
+) -> IdentityVerification:
+    """User submits their own identity verification, with an uploaded document, for
+    PENDING approval. The document category is always derived from document_type
+    server-side (never trusted from the client) so it can't be mismatched."""
+    if document_type not in DOCUMENT_TYPES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid document type")
-    if not data.encrypted_reference:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Encrypted reference is required")
+    if document_type == "other" and not custom_document_name.strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Please specify the document name for 'Other'")
     if not user_account.party_id:
         raise HTTPException(status.HTTP_409_CONFLICT, "User has no associated party")
 
     record = IdentityVerification(
         party_id=user_account.party_id,
-        document_type=data.document_type,
-        encrypted_reference=data.encrypted_reference,
-        evidence_ref=data.evidence_ref,
+        document_type=document_type,
+        document_category=DOCUMENT_CATEGORY_BY_TYPE[document_type],
+        custom_document_name=custom_document_name.strip() if document_type == "other" else "",
+        encrypted_reference=document_number.strip() or None,
+        evidence_ref="",
+        document_file_path=stored_filename,
+        document_file_original_name=original_filename,
+        document_file_content_type=content_type,
+        document_file_size=file_size,
         status="pending",
     )
     db.add(record)

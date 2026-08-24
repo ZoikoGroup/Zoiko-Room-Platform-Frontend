@@ -216,7 +216,14 @@ export default function AdminRegisterPage() {
           )}
         </div>
 
-        <p className="relative mt-8 animate-fade-up stagger-4 text-center text-xs text-primary-300">
+        <p className="relative mt-6 text-center text-xs text-primary-300">
+          Renting or hosting a room?{" "}
+          <Link href="/account/register" className="font-semibold text-primary-100 hover:text-white">
+            Create a Zoiko account instead
+          </Link>
+        </p>
+
+        <p className="relative mt-4 animate-fade-up stagger-4 text-center text-xs text-primary-300">
           © {new Date().getFullYear()} Zoiko Rooms. All rights reserved.
         </p>
       </div>

@@ -29,6 +29,7 @@ from app.models.review import Review
 from app.models.room import Room
 from app.models.room_passport import RoomPassportClaim, RoomPassportSnapshot
 from app.models.identity_verification import IdentityVerification
+from app.models.password_reset_token import PasswordResetToken
 
 __all__ = [
     "AdminUser",
@@ -66,4 +67,5 @@ __all__ = [
     "DisputeCase",
     "ReconciliationRun",
     "IdentityVerification",
+    "PasswordResetToken",
 ]

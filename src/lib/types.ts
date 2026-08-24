@@ -405,3 +405,177 @@ export interface ReconciliationRun {
   mismatches: string[];
   status: ReconciliationStatus;
 }
+
+// --- USER accounts (renters & hosts) ---
+// These mirror the /api/users/* schemas. They are deliberately separate from the
+// admin types above: a UserAccount authenticates with `zoiko_user_token` and is
+// never an AdminUser.
+
+export interface UserProfile {
+  id: number;
+  email: string;
+  fullName: string;
+  phone: string;
+  partyId: number | null;
+  emailVerified: boolean;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export type DocumentCategory = "identity" | "address" | "other";
+
+export type IdentityDocumentType =
+  // identity
+  | "aadhaar"
+  | "pan_card"
+  | "passport"
+  | "driving_license"
+  | "voter_id"
+  | "national_id"
+  | "residence_permit"
+  | "permanent_resident_card"
+  | "government_photo_id"
+  | "government_employee_id"
+  // address / residency
+  | "electricity_bill"
+  | "water_bill"
+  | "gas_bill"
+  | "telephone_bill"
+  | "internet_bill"
+  | "property_tax_bill"
+  | "bank_statement"
+  | "credit_card_statement"
+  | "government_address_certificate"
+  | "rental_agreement"
+  // other
+  | "birth_certificate"
+  | "marriage_certificate"
+  | "other_government_document"
+  | "other";
+
+export type IdentityVerificationStatus =
+  | "pending"
+  | "verified"
+  | "rejected"
+  | "expired"
+  | "additional_evidence_required";
+
+/** User-facing shape, returned by /api/users/identity-verifications. */
+export interface IdentityVerificationRecord {
+  id: number;
+  documentType: IdentityDocumentType;
+  documentCategory: DocumentCategory;
+  customDocumentName: string;
+  documentNumber: string;
+  evidenceRef: string;
+  status: IdentityVerificationStatus;
+  hasDocument: boolean;
+  documentOriginalName: string;
+  documentContentType: string;
+  verifiedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  verifierNotes: string;
+}
+
+/** Admin-facing shape, returned by /api/identity-verifications -- field names
+ *  mirror the backend's ORM-passthrough schema, which is why this differs
+ *  slightly from IdentityVerificationRecord above (e.g. encryptedReference
+ *  instead of documentNumber). */
+export interface AdminIdentityVerification {
+  id: number;
+  partyId: number;
+  documentType: IdentityDocumentType;
+  documentCategory: DocumentCategory;
+  customDocumentName: string;
+  encryptedReference: string | null;
+  evidenceRef: string;
+  verifiedAt: string | null;
+  expiresAt: string | null;
+  verifierAdminId: number | null;
+  verifierNotes: string;
+  status: IdentityVerificationStatus;
+  hasDocument: boolean;
+  documentFileOriginalName: string;
+  documentFileContentType: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserApplication {
+  id: number;
+  listingId: string;
+  status: ApplicationStatus;
+  message: string;
+  desiredMoveIn: string | null;
+  submittedAt: string;
+  updatedAt: string;
+}
+
+export interface UserOccupancy {
+  id: number;
+  listingId: string;
+  roomId: number;
+  status: OccupancyStatus;
+  moveInDate: string | null;
+  expectedEndDate: string | null;
+  moveOutDate: string | null;
+  createdAt: string;
+  endedAt: string | null;
+}
+
+export type SubletRequestStatus =
+  | "pending_verification"
+  | "pending_admin_review"
+  | "approved"
+  | "rejected";
+
+export interface SubletRequest {
+  id: number;
+  currentOccupancyId: number;
+  proposedRenterPartyId: number;
+  status: SubletRequestStatus;
+  authorityEvidenceRef: string;
+  adminDecision: string;
+  adminNotes: string;
+  decidedByAdminId: number | null;
+  createdAt: string;
+  decidedAt: string | null;
+}
+
+/** A listing owned by a user's party rather than an admin -- `ownerId` is always null
+ *  for these, ownership is carried by the backend's `party_id` column instead. */
+export interface HostedListing extends Omit<Listing, "ownerId"> {
+  ownerId: number | null;
+}
+
+/** The unauthenticated browse view returned by /api/public/listings. */
+export interface PublicListing {
+  id: string;
+  slug: string;
+  name: string;
+  propertyType: PropertyType;
+  roomType: string;
+  city: string;
+  location: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  pricePerNight: number;
+  rating: number;
+  reviewCount: number;
+  guests: number;
+  bedrooms: number;
+  bathrooms: number;
+  size: number;
+  images: string[];
+  amenities: string[];
+  tags: string[];
+  description: string;
+  featured?: boolean;
+  roomId: number | null;
+  minStayNights: number;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone: string;
+}
