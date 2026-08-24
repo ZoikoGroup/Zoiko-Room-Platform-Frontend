@@ -41,7 +41,8 @@ app.middleware("http")(correlation_id_middleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
+    # allow_origins=settings.cors_origin_list,
+    allow_origins = ["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,6 +50,12 @@ app.add_middleware(
 
 Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
+
+# Identity documents live in their own directory and are deliberately never
+# mounted here -- they're only reachable through the authenticated
+# /api/users/identity-verifications/{id}/document and
+# /api/identity-verifications/{id}/document routes.
+Path(settings.identity_upload_dir).mkdir(parents=True, exist_ok=True)
 
 app.include_router(auth.router)
 app.include_router(user_auth.router)

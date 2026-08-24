@@ -73,34 +73,48 @@ class IdentityVerificationCreate(CamelModel):
 
 
 class IdentityVerificationRead(CamelModel):
+    """Admin-facing full read -- field names deliberately match the ORM columns
+    (including the legacy `encrypted_reference` name) so this can be returned
+    straight from the model via response_model, no manual mapping needed."""
+
     id: int
     party_id: int
     document_type: str
-    encrypted_reference: str
+    document_category: str
+    custom_document_name: str
+    encrypted_reference: str | None
     evidence_ref: str
     verified_at: datetime | None
     expires_at: datetime | None
     verifier_admin_id: int | None
+    verifier_notes: str
     status: str
+    has_document: bool
+    document_file_original_name: str
+    document_file_content_type: str
     created_at: datetime
     updated_at: datetime
 
 
-class IdentityVerificationSubmitRequest(CamelModel):
-    """User-facing identity verification submission."""
-
-    document_type: str
-    encrypted_reference: str
-    evidence_ref: str = ""
+class IdentityVerificationReject(CamelModel):
+    notes: str = ""
 
 
 class IdentityVerificationUserRead(CamelModel):
-    """User-facing identity verification response."""
+    """User-facing identity verification response. Built from a hand-assembled
+    dict rather than ORM passthrough, so field names here are independent of the
+    ORM's column names (e.g. document_number vs. the legacy encrypted_reference)."""
 
     id: int
     document_type: str
+    document_category: str
+    custom_document_name: str
+    document_number: str = ""
     evidence_ref: str
     status: str
+    has_document: bool
+    document_original_name: str
+    document_content_type: str
     verified_at: datetime | None
     expires_at: datetime | None
     created_at: datetime

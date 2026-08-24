@@ -36,6 +36,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
 @router.post("/login", response_model=AdminRead)
 def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
     admin = authenticate(db, payload.email, payload.password)
+    print("login api test", admin)
     if not admin:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     if admin.approval_status == "pending":

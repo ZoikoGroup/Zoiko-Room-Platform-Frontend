@@ -109,3 +109,37 @@ export const reconciliationStatusTone = {
   CLEAN: "success",
   DISCREPANCIES_FOUND: "danger",
 } as const;
+
+// --- USER account surface ---
+
+export const identityStatusTone = {
+  not_submitted: "neutral",
+  pending: "warning",
+  verified: "success",
+  rejected: "danger",
+  expired: "danger",
+  additional_evidence_required: "warning",
+} as const;
+
+export const identityStatusLabel = {
+  not_submitted: "Not Verified",
+  pending: "Verification Pending",
+  verified: "Identity Verified",
+  rejected: "Verification Rejected",
+  expired: "Verification Expired",
+  additional_evidence_required: "More Evidence Needed",
+} as const;
+
+export const subletRequestStatusTone = {
+  pending_verification: "warning",
+  pending_admin_review: "warning",
+  approved: "success",
+  rejected: "danger",
+} as const;
+
+export const subletRequestStatusLabel = {
+  pending_verification: "Pending Verification",
+  pending_admin_review: "Pending Admin Review",
+  approved: "Approved",
+  rejected: "Rejected",
+} as const;

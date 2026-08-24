@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import USER_COOKIE_NAME, get_current_user
 from app.core.config import settings
+from app.core.mailer import send_password_reset_email
 from app.core.security import create_access_token, verify_password
+from app.crud.password_reset import create_reset_token, reset_password_with_token
 from app.crud.user import (
     authenticate_user,
     create_user,
@@ -14,6 +16,9 @@ from app.crud.user import (
 from app.db.session import get_db
 from app.models.user_account import UserAccount
 from app.schemas.user import (
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    ResetPasswordRequest,
     UserLoginRequest,
     UserPasswordChangeRequest,
     UserProfileUpdateRequest,
@@ -23,6 +28,10 @@ from app.schemas.user import (
 )
 
 router = APIRouter(prefix="/api/users", tags=["user-auth"])
+
+# Identical regardless of whether the email matched an account, so this endpoint
+# can't be used to enumerate registered users.
+GENERIC_FORGOT_PASSWORD_MESSAGE = "If an account exists for that email, a password reset link has been sent."
 
 
 def _set_user_cookie(response: Response, email: str) -> None:
@@ -99,3 +108,26 @@ def change_user_password(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
     update_user_password(db, user, payload.new_password)
     return {"ok": True}
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Requests a password reset. Always returns the same response, whether or not
+    the email belongs to an account -- never reveals which."""
+    user = get_user_by_email(db, payload.email)
+    if user and user.is_active:
+        raw_token = create_reset_token(db, user)
+        reset_link = f"{settings.frontend_url}/account/reset-password?token={raw_token}"
+        send_password_reset_email(user.email, reset_link, settings.password_reset_token_expire_minutes)
+    return ForgotPasswordResponse(message=GENERIC_FORGOT_PASSWORD_MESSAGE)
+
+
+@router.post("/reset-password", response_model=ForgotPasswordResponse)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Consumes a reset token issued by /forgot-password. Every USER session issued
+    before this call succeeds is invalidated -- see get_current_user."""
+    if len(payload.new_password) < 8:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Password must be at least 8 characters")
+    if not reset_password_with_token(db, payload.token, payload.new_password):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This reset link is invalid or has expired")
+    return ForgotPasswordResponse(message="Your password has been reset. You can now sign in.")

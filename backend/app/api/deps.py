@@ -3,7 +3,7 @@ from collections.abc import Generator
 from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, decode_access_token_claims
 from app.crud.admin import get_admin_by_email
 from app.crud.user import get_user_by_email
 from app.db.session import get_db
@@ -43,11 +43,20 @@ def get_current_user(
     unauthorized = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     if not zoiko_user_token:
         raise unauthorized
-    email = decode_access_token(zoiko_user_token)
+    claims = decode_access_token_claims(zoiko_user_token)
+    email = claims.get("sub") if claims else None
     if not email:
         raise unauthorized
     user = get_user_by_email(db, email)
     if not user or not user.is_active:
         raise unauthorized
+    # A password reset stamps password_changed_at -- any token issued before that
+    # moment (i.e. every session that existed at reset time) is rejected here,
+    # forcing a fresh login. Rows created before this feature have no timestamp and
+    # are unaffected.
+    if user.password_changed_at is not None:
+        issued_at = claims.get("iat") if claims else None
+        if not isinstance(issued_at, (int, float)) or issued_at < user.password_changed_at.timestamp():
+            raise unauthorized
     return user
 

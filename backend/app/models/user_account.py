@@ -23,6 +23,11 @@ class UserAccount(Base):
     party_id: Mapped[int | None] = mapped_column(ForeignKey("parties.id", ondelete="SET NULL"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Set only when a password is changed via the forgot-password/reset-password
+    # flow (not the authenticated change-password endpoint) -- see
+    # app/api/deps.py:get_current_user, which rejects any token issued before this
+    # timestamp so a reset immediately invalidates sessions from other devices.
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
