@@ -1,8 +1,16 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Anchor .env to the backend package root so settings load regardless of the
+# working directory uvicorn (or an IDE run config) is started from.
+BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=str(BACKEND_DIR / ".env"), env_file_encoding="utf-8", extra="ignore"
+    )
 
     database_url: str = "postgresql+psycopg://zoiko:zoiko@localhost:5432/zoiko_rooms"
     jwt_secret: str = "dev-secret-change-me"
@@ -25,6 +33,10 @@ class Settings(BaseSettings):
 
     frontend_url: str = "http://localhost:3000"
     password_reset_token_expire_minutes: int = 30
+
+    llm_provider: str = "groq"
+    groq_api_key: str = ""
+    groq_model: str = "openai/gpt-oss-120b"
 
     @property
     def cors_origin_list(self) -> list[str]:
