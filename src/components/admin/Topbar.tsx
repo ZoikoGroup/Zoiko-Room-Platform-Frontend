@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, BedDouble, CalendarRange, ChevronDown, Loader2, LogOut, Menu, Search, Settings, UserCircle2, Users } from "lucide-react";
+import { Bell, BedDouble, CalendarRange, ChevronDown, Loader2, LogOut, Menu, MessageSquare, Search, Settings, UserCircle2, Users } from "lucide-react";
 import { getCurrentAdmin, logout } from "@/lib/auth";
 import { apiClientFetch } from "@/lib/api-client";
 import { SearchResult } from "@/lib/types";
@@ -21,7 +21,13 @@ const notifications = [
   { id: 3, text: "New 5-star review on Azure Cliffside Villa", time: "3h ago" },
 ];
 
-export function Topbar({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => void }) {
+export function Topbar({
+  onOpenMobileSidebar,
+  onToggleChat,
+}: {
+  onOpenMobileSidebar: () => void;
+  onToggleChat: () => void;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [notifOpen, setNotifOpen] = useState(false);
@@ -144,6 +150,15 @@ export function Topbar({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => voi
 
       <div ref={ref} className="flex items-center gap-3">
         <ThemeToggle />
+
+        <button
+          onClick={onToggleChat}
+          aria-label="Open Zoiko assistant chat"
+          title="Zoiko Assistant"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
+        >
+          <MessageSquare className="h-5 w-5" />
+        </button>
 
         <div className="relative">
           <button

@@ -139,6 +139,43 @@ The 3-role authentication system (SUPER_ADMIN, ADMIN, USER) has been **successfu
    - Tracks request status with workflow
    - Links to current occupancy, proposed renter, and admin reviewer
 
+5. **0013_allow_user_owned_listings.py**
+   - Makes `listings.owner_id` nullable so USER-hosted listings can rely on `party_id` alone
+
+6. **0014_chat_tables.py**
+   - Creates `chat_conversations` and `chat_messages` tables for the admin chatbot (see section 11)
+
+---
+
+### 11. **Admin Chatbot (Phase 1 — Admin Only)** ✅
+**Files**:
+- Models: `backend/app/models/chat.py`
+- Migration: `backend/alembic/versions/0014_chat_tables.py`
+- Service: `backend/app/services/chat_service.py` (new `services/` layer)
+- Routes: `backend/app/api/routes/chatbot.py`
+- Schemas: `backend/app/schemas/chat.py`
+- Frontend: `src/lib/chat.ts`, `src/components/admin/chat/AdminChatPanel.tsx`
+
+**Endpoints** (`backend/app/api/routes/chatbot.py`, all require `zoiko_admin_token`):
+- `GET /api/admin/chat/conversations` - List the current admin's conversations
+- `POST /api/admin/chat/conversations` - Create a conversation (audit logged)
+- `GET /api/admin/chat/conversations/{id}/messages` - Message history (404 unless owner)
+- `POST /api/admin/chat/conversations/{id}/messages/stream` - SSE stream: text deltas, tool activity, done/error events
+
+**Key Features**:
+- **Groq is live and working end-to-end** (verified: tool call → streamed markdown reply → persisted). Provider: Groq OpenAI-compatible API via official `groq` SDK; model `openai/gpt-oss-120b` (configurable via `GROQ_MODEL`; the previously planned `llama-3.3-70b-versatile` was deprecated/shut down by Groq on 2026-08-16). Key via `GROQ_API_KEY`; legacy `ANTHROPIC_API_KEY` kept in `.env` behind the `LLM_PROVIDER` flag
+- **`.env` loading fixed at root cause**: `env_file` is now anchored to the backend package directory, so settings load no matter which directory uvicorn/IDE starts from (previously a repo-root launch silently found no `.env`)
+- **Startup warning**: booting without `GROQ_API_KEY` logs a one-line warning immediately (distinct from runtime chat errors)
+- **Conversation history implemented**: auto-titled from first user message, slide-in history list with relative timestamps (most recent first), "New chat" action, active conversation persisted intentionally in `sessionStorage` with an explicit "Continuing: <title>" banner on reload, per-conversation load, delete with inline confirm step (`DELETE /api/admin/chat/conversations/{id}`, owner-scoped)
+- **Per-admin isolation verified**: list endpoint filters by `admin_id`; cross-admin reads/deletes return 404 (smoke tested)
+- **Error-state handling implemented**, all user-safe (no env-var names in UI; technical detail logged server-side only): missing/misconfigured key, rate limit ("Assistant is busy…"), connection failure (auto-retried server-side before surfacing), tool-fetch failures surfaced as inline amber notes while generation continues; failed messages get an inline Retry action; Groq client has a bounded timeout so hung calls can't hold SSE open
+- Read-only function-calling tools mapped to existing role-scoped CRUD helpers (OpenAI tool schema); role gating enforced deterministically outside the model (super_admin-only: bookings/guests/reviews/payments/analytics; owner-scoped otherwise) — unchanged from initial build
+- Audit logging fires for both success and error paths (`chat.message`, `chat.error`, `chat.conversation.create/delete`)
+- **UI polish**: assistant bubbles with avatar + markdown rendering (lists, bold, tables via `react-markdown` + `remark-gfm`), typing indicator, empty state with suggested-prompt chips, auto-scroll that yields to manual scrolling, stop-generation control, send disabled while streaming, Enter/Shift+Enter handling, explicit context banner, dev-only "connected" toast confirming the Groq key works
+- Two launchers (Topbar button + bottom-right FAB) toggle one shared panel state; FAB hides while panel is open; docked panel >=1280px / overlay below xl / full-screen mobile — re-verified
+- Free-tier caveat: Groq rate-limits requests/tokens per minute; 429s surface as "Assistant is busy right now"
+- User-side chatbot remains deferred to Phase 2
+
 ---
 
 ### 7. **CRUD Operations** ✅
@@ -307,7 +344,7 @@ backend/
       sublet_request.py        ✅ NEW - Sublet workflow model
       party.py                 ✅ UPDATED - Added relationships
       listing.py               ✅ UPDATED - Added party_id FK
-    
+
     api/
       routes/
         user_auth.py           ✅ NEW - Register/login/profile
@@ -315,18 +352,18 @@ backend/
         user_rentals.py        ✅ NEW - Applications/occupancies/sublets
         user_hosting.py        ✅ NEW - Property/room management
         occupancy.py           ✅ UPDATED - Sublet approval endpoints
-      
+
       deps.py                  ✅ UPDATED - Added get_current_user()
-    
+
     crud/
       user.py                  ✅ NEW - User account CRUD
       sublet.py                ✅ NEW - Sublet workflow CRUD
       identity_verification.py ✅ UPDATED - User submission methods
-    
+
     schemas/
       user.py                  ✅ NEW - User auth/profile schemas
       leasing.py               ✅ UPDATED - SubletRequestRead schema
-    
+
     main.py                    ✅ UPDATED - Routes registered
 
   alembic/
@@ -477,6 +514,6 @@ backend/
 
 All code has been implemented, reviewed, and is ready for testing and deployment. No outstanding issues or incomplete sections.
 
-**Last Updated**: 2026-01-XX  
-**Status**: Phase 7 - Testing & Validation (In Progress)  
-**Next**: Run Alembic migrations and execute manual test scenarios
+**Last Updated**: 2026-08-24
+**Status**: Phase 7 - Testing & Validation (In Progress) + Admin Chatbot (Phase 1) implemented
+**Next**: Chatbot v1 shipped — Groq live, history + error handling in. Restart the backend (full stop/start, not hot reload) to pick up `.env`/config changes; remaining validation is manual UX testing in the browser.
