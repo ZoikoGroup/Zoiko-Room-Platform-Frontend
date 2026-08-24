@@ -201,7 +201,9 @@ TOOL_REGISTRY: dict[str, ToolSpec] = {
             description="List rent/payment obligations, optionally filtered by occupancy id.",
             parameters={
                 "type": "object",
-                "properties": {"occupancy_id": {"type": "integer"}},
+                # Nullable: models omit optional filters by passing null, and
+                # Groq validates args against this schema server-side.
+                "properties": {"occupancy_id": {"type": ["integer", "null"]}},
             },
             handler=_tool_list_obligations,
         ),
@@ -222,7 +224,7 @@ TOOL_REGISTRY: dict[str, ToolSpec] = {
             description="Monthly revenue trend points for recent months.",
             parameters={
                 "type": "object",
-                "properties": {"months": {"type": "integer", "default": 6}},
+                "properties": {"months": {"type": ["integer", "null"], "default": 6}},
             },
             handler=_tool_revenue_trend,
             super_admin_only=True,
