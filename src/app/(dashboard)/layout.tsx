@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { ChatLauncherFab } from "@/components/admin/ChatLauncherFab";
@@ -12,7 +12,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [hasUnread, setHasUnread] = useState(false);
+  const prevChatOpenRef = useRef(chatOpen);
   const pathname = usePathname();
+
+  // Track when the chat panel closes — if the admin was mid-conversation,
+  // mark the launcher as unread until they reopen the panel.
+  useEffect(() => {
+    if (prevChatOpenRef.current && !chatOpen) {
+      // Panel just closed — assume there may be an unread response.
+      const timer = setTimeout(() => setHasUnread(true), 2000);
+      return () => clearTimeout(timer);
+    }
+    if (chatOpen) {
+      setHasUnread(false);
+    }
+    prevChatOpenRef.current = chatOpen;
+  }, [chatOpen]);
+
+  const handleUnread = useCallback(() => setHasUnread(true), []);
 
   return (
     <AdminGuard>
@@ -32,8 +50,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
 
-      <AdminChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
-      <ChatLauncherFab open={chatOpen} onToggle={() => setChatOpen((o) => !o)} />
+      <AdminChatPanel open={chatOpen} onClose={() => setChatOpen(false)} onUnread={handleUnread} />
+      <ChatLauncherFab open={chatOpen} onToggle={() => setChatOpen((o) => !o)} hasUnread={hasUnread} />
     </AdminGuard>
   );
 }
