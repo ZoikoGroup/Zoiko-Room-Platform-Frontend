@@ -10,6 +10,7 @@ from app.api.routes import (
     authority,
     auth,
     bookings,
+    chatbot,
     finance,
     guests,
     identity_verification,
@@ -34,6 +35,16 @@ from app.api.routes import (
 )
 from app.core.config import settings
 from app.core.correlation import correlation_id_middleware
+
+import logging
+
+logger = logging.getLogger("uvicorn.error")
+
+if settings.llm_provider == "groq" and not settings.groq_api_key:
+    logger.warning(
+        "chatbot: GROQ_API_KEY is not set -- the admin assistant will reply with a "
+        "configuration error until you add it to backend/.env and restart."
+    )
 
 app = FastAPI(title="Zoiko Rooms API")
 
@@ -83,6 +94,7 @@ app.include_router(occupancy_classification.router)
 app.include_router(leasing.router)
 app.include_router(occupancy.router)
 app.include_router(finance.router)
+app.include_router(chatbot.router)
 
 
 @app.get("/health")
