@@ -579,3 +579,19 @@ export interface PublicListing {
   ownerEmail: string;
   ownerPhone: string;
 }
+
+// --- Notifications (shared shape for both /api/notifications (admin) and
+// /api/users/notifications (user) -- each endpoint only ever returns the
+// authenticated caller's own rows). ---
+
+export interface AppNotification {
+  id: number;
+  title: string;
+  message: string;
+  notificationType: string;
+  relatedEntityType: string;
+  relatedEntityId: string;
+  isRead: boolean;
+  createdAt: string;
+  readAt: string | null;
+}

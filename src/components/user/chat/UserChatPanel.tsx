@@ -69,7 +69,7 @@ function TypingDots() {
   );
 }
 
-export function UserChatPanel({ open, onClose, onUnread }: UserChatPanelProps) {
+export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
   const [conversations, setConversations] = useState<UserChatConversation[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [activeTitle, setActiveTitle] = useState<string>("");

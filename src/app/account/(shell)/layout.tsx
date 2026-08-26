@@ -41,6 +41,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
           onToggleCollapse={() => setCollapsed((c) => !c)}
           mobileOpen={mobileOpen}
           onCloseMobile={() => setMobileOpen(false)}
+          onOpenChat={() => setChatOpen(true)}
         />
 
         <div className="flex min-h-screen flex-1 flex-col lg:min-w-0">

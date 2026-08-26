@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import (
+    admin_notifications,
     admin_users,
     analytics,
     authority,
@@ -31,6 +32,7 @@ from app.api.routes import (
     user_chat,
     user_hosting,
     user_identity,
+    user_notifications,
     user_payments,
     user_rentals,
 )
@@ -53,8 +55,7 @@ app.middleware("http")(correlation_id_middleware)
 
 app.add_middleware(
     CORSMiddleware,
-    # allow_origins=settings.cors_origin_list,
-    allow_origins = ["http://localhost:3000"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -97,6 +98,8 @@ app.include_router(occupancy.router)
 app.include_router(finance.router)
 app.include_router(chatbot.router)
 app.include_router(user_chat.router)
+app.include_router(user_notifications.router)
+app.include_router(admin_notifications.router)
 
 
 @app.get("/health")

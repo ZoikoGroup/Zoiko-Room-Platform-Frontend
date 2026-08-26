@@ -118,7 +118,7 @@ export function HostingPropertiesManager() {
           subtitle="Add a property, then add the rooms you want to host. Listings are created from rooms."
         />
         <Button size="sm" onClick={() => setPropertyForm({ id: null, address: "", city: "" })}>
-          <Plus className="h-4 w-4" /> Add property
+          <Plus className="h-4 w-4" /> Add Property
         </Button>
       </div>
 
