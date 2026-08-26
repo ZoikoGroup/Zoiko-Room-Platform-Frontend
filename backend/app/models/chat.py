@@ -7,12 +7,13 @@ from app.db.base import Base
 
 
 class ChatConversation(Base):
-    """Admin-side chatbot conversation. One conversation per admin session thread."""
+    """Chatbot conversation. admin_id is set for admin-side chats, user_id for user-side chats."""
 
     __tablename__ = "chat_conversations"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    admin_id: Mapped[int] = mapped_column(ForeignKey("admin_users.id"), nullable=False, index=True)
+    admin_id: Mapped[int | None] = mapped_column(ForeignKey("admin_users.id"), nullable=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("user_accounts.id"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(200), default="New conversation")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(

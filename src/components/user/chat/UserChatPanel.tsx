@@ -17,30 +17,30 @@ import {
   X,
 } from "lucide-react";
 import {
-  ChatConversation,
-  ChatMessage,
-  createChatConversation,
-  deleteChatConversation,
-  listChatMessages,
-  listChatConversations,
-  streamChatMessage,
-} from "@/lib/chat";
+  UserChatConversation,
+  UserChatMessage,
+  createUserChatConversation,
+  deleteUserChatConversation,
+  listUserChatMessages,
+  listUserChatConversations,
+  streamUserChatMessage,
+} from "@/lib/user-chat";
 import { MarkdownMessage } from "@/components/admin/chat/MarkdownMessage";
 import { cn } from "@/lib/utils";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
 
-interface AdminChatPanelProps {
+interface UserChatPanelProps {
   open: boolean;
   onClose: () => void;
   onUnread?: () => void;
 }
 
 const SUGGESTED_PROMPTS = [
-  "Show my recent bookings",
-  "Which listings aren't published yet?",
-  "Summarize the revenue trend",
-  "Which occupancies are due for rent?",
+  "Find rooms in Mumbai",
+  "What's the status of my application?",
+  "Show my occupancy details",
+  "What payments do I owe?",
 ];
 
 function relativeTime(iso: string): string {
@@ -69,13 +69,13 @@ function TypingDots() {
   );
 }
 
-export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps) {
-  const [conversations, setConversations] = useState<ChatConversation[]>([]);
+export function UserChatPanel({ open, onClose, onUnread }: UserChatPanelProps) {
+  const [conversations, setConversations] = useState<UserChatConversation[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [activeTitle, setActiveTitle] = useState<string>("");
   const [isContinuing, setIsContinuing] = useState(false);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<UserChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streamingText, setStreamingText] = useState("");
   const [toolActivity, setToolActivity] = useState<string | null>(null);
@@ -105,9 +105,6 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
     });
   }, []);
 
-  // Load the conversation list for the history drawer. The panel itself always
-  // opens on a deliberate new-chat state -- past conversations are reachable
-  // via History, never auto-restored after a page refresh.
   useEffect(() => {
     if (!open) {
       abortRef.current?.abort();
@@ -117,7 +114,7 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
     stickToBottomRef.current = true;
     (async () => {
       try {
-        const list = await listChatConversations();
+        const list = await listUserChatConversations();
         if (cancelled) return;
         setConversations(list);
       } catch {
@@ -172,7 +169,7 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
     synthesis.stop();
     speech.stopListening();
     try {
-      const history = await listChatMessages(id);
+      const history = await listUserChatMessages(id);
       setActiveId(id);
       setActiveTitle(conversations.find((c) => c.id === id)?.title ?? "");
       setIsContinuing(true);
@@ -191,7 +188,7 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
 
   async function handleDeleteConfirmed(id: number) {
     try {
-      await deleteChatConversation(id);
+      await deleteUserChatConversation(id);
       setConversations((prev) => prev.filter((c) => c.id !== id));
       if (id === activeId) startNewChat();
     } catch {
@@ -223,7 +220,7 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
     try {
       let conversationId = activeId;
       if (!conversationId) {
-        const created = await createChatConversation();
+        const created = await createUserChatConversation();
         conversationId = created.id;
         setActiveId(conversationId);
         setActiveTitle(content.slice(0, 60));
@@ -234,7 +231,7 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
       abortRef.current = controller;
 
       let assistantDone = "";
-      for await (const event of streamChatMessage(conversationId, content, controller.signal)) {
+      for await (const event of streamUserChatMessage(conversationId, content, controller.signal)) {
         if (event.type === "text") {
           streamBufRef.current += event.text;
           setStreamingText(streamBufRef.current);
@@ -302,7 +299,6 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
 
   return (
     <>
-      {/* Backdrop below xl -- the panel is docked (no backdrop) on >=1280px screens */}
       <button
         aria-label="Close chat"
         onClick={onClose}
@@ -310,7 +306,7 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
       />
 
       <aside
-        aria-label="Zoiko admin assistant"
+        aria-label="Zoiko assistant"
         className={cn(
           "fixed inset-y-0 right-0 z-50 flex w-full flex-col overflow-hidden bg-white shadow-2xl shadow-primary-900/20 dark:bg-slate-900",
           "sm:max-w-md sm:rounded-l-3xl xl:max-w-[448px] xl:rounded-l-none"
@@ -324,7 +320,7 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100">Zoiko Assistant</p>
               <p className="truncate text-xs text-slate-400">
-                {isContinuing && activeTitle ? activeTitle : "Read-only · answers from your dashboard data"}
+                {isContinuing && activeTitle ? activeTitle : "Your rental & hosting helper"}
               </p>
             </div>
           </div>
@@ -356,7 +352,6 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
           </div>
         </header>
 
-        {/* Context banner -- only shown when an older conversation is loaded */}
         {isContinuing && (
           <div className="flex items-center gap-1.5 border-b border-slate-100 bg-slate-50 px-5 py-1.5 text-[11px] font-medium text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
             <Clock className="h-3 w-3" />
@@ -371,8 +366,7 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
                 <Bot className="h-6 w-6" />
               </span>
               <p className="max-w-[280px] text-sm leading-relaxed text-slate-400">
-                Ask me about bookings, occupancy, payments, or guests — I can look data up, but I never
-                change anything.
+                Ask me about available rooms, your applications, payments, or anything about your stay — I&apos;m here to help.
               </p>
               <div className="flex max-w-[320px] flex-wrap justify-center gap-2">
                 {SUGGESTED_PROMPTS.map((prompt) => (
@@ -514,7 +508,7 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
                 }
               }}
               rows={1}
-              placeholder={speech.isListening ? "Listening…" : "Ask about your operations…"}
+              placeholder={speech.isListening ? "Listening…" : "Ask about rooms, applications, payments…"}
               disabled={sending}
               className="max-h-32 flex-1 resize-none rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 disabled:opacity-60 dark:bg-white/10 dark:text-slate-200"
             />
@@ -541,7 +535,6 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
           </form>
         </footer>
 
-        {/* Conversation history slide-over */}
         {historyOpen && (
           <div className="animate-fade-up absolute inset-0 z-20 flex flex-col bg-white dark:bg-slate-900">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-white/10">
@@ -611,7 +604,6 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
         )}
       </aside>
 
-      {/* Dev-only confirmation that the Groq key is live */}
       {connectedToast && process.env.NODE_ENV === "development" && (
         <div className="animate-fade-up fixed bottom-6 left-6 z-[70] flex items-center gap-2.5 rounded-2xl bg-white px-4 py-3 shadow-xl shadow-primary-900/20 ring-1 ring-emerald-200 dark:bg-slate-800 dark:ring-emerald-500/30">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">

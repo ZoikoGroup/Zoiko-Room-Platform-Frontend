@@ -1,5 +1,4 @@
 from pathlib import Path
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Anchor .env to the backend package root so settings load regardless of the

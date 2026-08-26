@@ -28,6 +28,7 @@ from app.api.routes import (
     settings as settings_routes,
     uploads,
     user_auth,
+    user_chat,
     user_hosting,
     user_identity,
     user_payments,
@@ -95,6 +96,7 @@ app.include_router(leasing.router)
 app.include_router(occupancy.router)
 app.include_router(finance.router)
 app.include_router(chatbot.router)
+app.include_router(user_chat.router)
 
 
 @app.get("/health")

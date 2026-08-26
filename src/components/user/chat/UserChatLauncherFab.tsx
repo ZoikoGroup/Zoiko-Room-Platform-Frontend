@@ -3,22 +3,13 @@
 import { MessageSquare, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface ChatLauncherFabProps {
+interface UserChatLauncherFabProps {
   open: boolean;
   onToggle: () => void;
   hasUnread?: boolean;
 }
 
-/** Floating action button that opens/closes the AdminChatPanel.
- *
- * Animation states:
- *  - **Idle**: gentle vertical float (animate-float, 4s cycle)
- *  - **Hover**: scale-up + subtle rotate for interactivity feedback
- *  - **Unread**: pulsing accent ring + ping on the status dot
- *  - **Open → closed**: icon morphs from chat-bubble to X with a
- *    scale/rotate transition instead of abruptly disappearing
- *  - All animations respect `prefers-reduced-motion` via globals.css */
-export function ChatLauncherFab({ open, onToggle, hasUnread = false }: ChatLauncherFabProps) {
+export function UserChatLauncherFab({ open, onToggle, hasUnread = false }: UserChatLauncherFabProps) {
   return (
     <button
       type="button"
@@ -26,21 +17,14 @@ export function ChatLauncherFab({ open, onToggle, hasUnread = false }: ChatLaunc
       aria-label={open ? "Close Zoiko assistant chat" : "Open Zoiko assistant chat"}
       title="Zoiko Assistant"
       className={cn(
-        // Base: fixed position, size, colors
         "fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full shadow-xl shadow-primary-900/30",
-        // Colors
         "bg-accent-600 text-white hover:bg-accent-700",
-        // Transitions: smooth open/close morph
         "transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
-        // Open state: shrink + rotate + hide
         open && "pointer-events-none scale-0 rotate-90 opacity-0",
-        // Closed state: idle float + hover effects
         !open && "animate-float hover:scale-110 hover:rotate-3 active:scale-95",
-        // Unread: pulsing accent ring (replaces idle float while attention-grabbing)
         !open && hasUnread && "animate-pulse-ring"
       )}
     >
-      {/* Icon morph: chat bubble ↔ close */}
       <span
         className={cn(
           "absolute transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
@@ -58,7 +42,6 @@ export function ChatLauncherFab({ open, onToggle, hasUnread = false }: ChatLaunc
         <X className="h-6 w-6" />
       </span>
 
-      {/* Online status dot — turns into a ping indicator when there's an unread message */}
       <span className="absolute right-1 top-1 flex h-3 w-3">
         {hasUnread && !open && (
           <span className="absolute inline-flex h-full w-full animate-notification-ping rounded-full bg-accent-400 opacity-75" />
