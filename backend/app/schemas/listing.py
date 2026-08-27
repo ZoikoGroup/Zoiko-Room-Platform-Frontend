@@ -67,10 +67,23 @@ class ListingRead(ListingBase):
 
 
 class PublicListingRead(ListingBase):
+    """Unauthenticated, public-facing shape -- deliberately excludes the host's
+    email/phone/any other private contact detail. Only the display name is
+    public, matching normal marketplace attribution (e.g. "Hosted by Priya")
+    rather than a way to reach the host directly."""
+
     id: str
     slug: str
     rating: float
     review_count: int
     owner_name: str
-    owner_email: str
-    owner_phone: str
+
+
+class PublicListingsPage(CamelModel):
+    """Paginated envelope for GET /api/public/listings."""
+
+    items: list[PublicListingRead]
+    limit: int
+    offset: int
+    total: int
+    has_more: bool

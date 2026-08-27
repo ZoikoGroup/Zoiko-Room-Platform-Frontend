@@ -4,7 +4,7 @@ import {
   IdentityDocumentType,
   IdentityVerificationRecord,
   Property,
-  PublicListing,
+  PublicListingsPage,
   PublishEligibility,
   Room,
   SimulatedPayment,
@@ -72,8 +72,29 @@ export function hasVerifiedIdentity(records: IdentityVerificationRecord[]): bool
 // --- Renting ---------------------------------------------------------------
 
 /** Public catalogue of PUBLISHED listings -- the inventory a user can apply to. */
-export function listPublicListings(): Promise<PublicListing[]> {
-  return apiClientFetch<PublicListing[]>("/api/public/listings");
+export interface PublicListingFilters {
+  city?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  roomType?: string;
+  amenities?: string[];
+  limit?: number;
+  offset?: number;
+}
+
+/** Server-side filtered + paginated search over PUBLISHED listings. Filtering
+ *  happens entirely in the backend query -- never fetch everything and filter
+ *  client-side. */
+export function listPublicListings(filters: PublicListingFilters = {}): Promise<PublicListingsPage> {
+  const params = new URLSearchParams();
+  if (filters.city) params.set("city", filters.city);
+  if (filters.minPrice != null) params.set("min_price", String(filters.minPrice));
+  if (filters.maxPrice != null) params.set("max_price", String(filters.maxPrice));
+  if (filters.roomType) params.set("room_type", filters.roomType);
+  if (filters.amenities?.length) params.set("amenities", filters.amenities.join(","));
+  params.set("limit", String(filters.limit ?? 20));
+  params.set("offset", String(filters.offset ?? 0));
+  return apiClientFetch<PublicListingsPage>(`/api/public/listings?${params.toString()}`);
 }
 
 export function submitRentalApplication(payload: {

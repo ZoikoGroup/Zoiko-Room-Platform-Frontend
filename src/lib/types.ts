@@ -575,9 +575,17 @@ export interface PublicListing {
   featured?: boolean;
   roomId: number | null;
   minStayNights: number;
+  // Deliberately no ownerEmail/ownerPhone -- the public endpoint never returns a
+  // host's contact details to an unauthenticated caller.
   ownerName: string;
-  ownerEmail: string;
-  ownerPhone: string;
+}
+
+export interface PublicListingsPage {
+  items: PublicListing[];
+  limit: number;
+  offset: number;
+  total: number;
+  hasMore: boolean;
 }
 
 // --- Notifications (shared shape for both /api/notifications (admin) and
