@@ -147,34 +147,58 @@ The 3-role authentication system (SUPER_ADMIN, ADMIN, USER) has been **successfu
 
 ---
 
-### 11. **Admin Chatbot (Phase 1 — Admin Only)** ✅
-**Files**:
-- Models: `backend/app/models/chat.py`
-- Migration: `backend/alembic/versions/0014_chat_tables.py`
-- Service: `backend/app/services/chat_service.py` (new `services/` layer)
-- Routes: `backend/app/api/routes/chatbot.py`
+### 11. **Chatbot (Admin + User) — Complete** ✅
+**Admin files**:
+- Models: `backend/app/models/chat.py` (dual-use: admin_id or user_id)
+- Migration: `backend/alembic/versions/0014_chat_tables.py` (chat tables), `0016_user_chat_conversations.py` (user_id column), `0017_make_admin_id_nullable.py` (nullable fix), `0018_chat_conv_check.py` (CHECK constraint)
+- Service: `backend/app/services/chat_service.py` (shared service layer)
+- Routes: `backend/app/api/routes/chatbot.py` (admin), `backend/app/api/routes/user_chat.py` (user)
 - Schemas: `backend/app/schemas/chat.py`
 - Frontend: `src/lib/chat.ts`, `src/components/admin/chat/AdminChatPanel.tsx`
 
-**Endpoints** (`backend/app/api/routes/chatbot.py`, all require `zoiko_admin_token`):
+**User files**:
+- Routes: `backend/app/api/routes/user_chat.py`
+- Frontend: `src/lib/user-chat.ts`, `src/components/user/chat/UserChatPanel.tsx`, `src/components/user/chat/UserChatLauncherFab.tsx`
+- Layout integration: `src/app/account/(shell)/layout.tsx`
+
+**Admin Endpoints** (`backend/app/api/routes/chatbot.py`, all require `zoiko_admin_token`):
 - `GET /api/admin/chat/conversations` - List the current admin's conversations
 - `POST /api/admin/chat/conversations` - Create a conversation (audit logged)
+- `DELETE /api/admin/chat/conversations/{id}` - Delete a conversation (owner-scoped)
 - `GET /api/admin/chat/conversations/{id}/messages` - Message history (404 unless owner)
 - `POST /api/admin/chat/conversations/{id}/messages/stream` - SSE stream: text deltas, tool activity, done/error events
+
+**User Endpoints** (`backend/app/api/routes/user_chat.py`, all require `zoiko_user_token`):
+- `GET /api/users/chat/conversations` - List the current user's conversations
+- `POST /api/users/chat/conversations` - Create a conversation (audit logged)
+- `DELETE /api/users/chat/conversations/{id}` - Delete a conversation (owner-scoped)
+- `GET /api/users/chat/conversations/{id}/messages` - Message history (404 unless owner)
+- `POST /api/users/chat/conversations/{id}/messages/stream` - SSE stream: text deltas, tool activity, done/error events
 
 **Key Features**:
 - **Groq is live and working end-to-end** (verified: tool call → streamed markdown reply → persisted). Provider: Groq OpenAI-compatible API via official `groq` SDK; model `openai/gpt-oss-120b` (configurable via `GROQ_MODEL`; the previously planned `llama-3.3-70b-versatile` was deprecated/shut down by Groq on 2026-08-16). Key via `GROQ_API_KEY`; legacy `ANTHROPIC_API_KEY` kept in `.env` behind the `LLM_PROVIDER` flag
 - **`.env` loading fixed at root cause**: `env_file` is now anchored to the backend package directory, so settings load no matter which directory uvicorn/IDE starts from (previously a repo-root launch silently found no `.env`)
 - **Startup warning**: booting without `GROQ_API_KEY` logs a one-line warning immediately (distinct from runtime chat errors)
-- **Conversation history implemented**: auto-titled from first user message, slide-in history list with relative timestamps (most recent first), "New chat" action, active conversation persisted intentionally in `sessionStorage` with an explicit "Continuing: <title>" banner on reload, per-conversation load, delete with inline confirm step (`DELETE /api/admin/chat/conversations/{id}`, owner-scoped)
-- **Per-admin isolation verified**: list endpoint filters by `admin_id`; cross-admin reads/deletes return 404 (smoke tested)
+- **Conversation history implemented**: auto-titled from first user message, slide-in history list with relative timestamps (most recent first), "New chat" action, per-conversation load, delete with inline confirm step (owner-scoped)
+- **Per-actor isolation verified**: admin conversations filter by `admin_id`, user conversations filter by `user_id`; cross-actor reads/deletes return 404 (automated test coverage)
 - **Error-state handling implemented**, all user-safe (no env-var names in UI; technical detail logged server-side only): missing/misconfigured key, rate limit ("Assistant is busy…"), connection failure (auto-retried server-side before surfacing), tool-fetch failures surfaced as inline amber notes while generation continues; failed messages get an inline Retry action; Groq client has a bounded timeout so hung calls can't hold SSE open
-- Read-only function-calling tools mapped to existing role-scoped CRUD helpers (OpenAI tool schema); role gating enforced deterministically outside the model (super_admin-only: bookings/guests/reviews/payments/analytics; owner-scoped otherwise) — unchanged from initial build
-- Audit logging fires for both success and error paths (`chat.message`, `chat.error`, `chat.conversation.create/delete`)
+- Read-only function-calling tools mapped to existing role-scoped CRUD helpers (OpenAI tool schema); role gating enforced deterministically outside the model
+  - **Admin tools** (13): search_platform, list_listings, get_listing, list_obligations, list_occupancies, list_applications + super_admin-only: list_bookings, list_guests, list_reviews, list_payments, revenue_trend, bookings_by_type, occupancy_by_city
+  - **User tools** (7): search_listings, get_listing_details, my_applications, my_occupancies, my_obligations, my_payments, my_host_listings
+- Audit logging fires for both success and error paths (`chat.message`, `chat.error`, `chat.conversation.create/delete`, `user_chat.*`)
 - **UI polish**: assistant bubbles with avatar + markdown rendering (lists, bold, tables via `react-markdown` + `remark-gfm`), typing indicator, empty state with suggested-prompt chips, auto-scroll that yields to manual scrolling, stop-generation control, send disabled while streaming, Enter/Shift+Enter handling, explicit context banner, dev-only "connected" toast confirming the Groq key works
-- Two launchers (Topbar button + bottom-right FAB) toggle one shared panel state; FAB hides while panel is open; docked panel >=1280px / overlay below xl / full-screen mobile — re-verified
+- **Shared components**: MarkdownMessage component shared between admin and user panels; speech recognition/synthesis hooks shared
+- **User-specific features**: Contact Admin form (subject + message via contact_email system), user-specific suggested prompts
+- Admin panel: Two launchers (Topbar button + bottom-right FAB) toggle one shared panel state; FAB hides while panel is open
+- User panel: Launcher FAB in account shell layout, same panel behavior
 - Free-tier caveat: Groq rate-limits requests/tokens per minute; 429s surface as "Assistant is busy right now"
-- User-side chatbot remains deferred to Phase 2
+- **User chatbot shipped ahead of schedule** — originally planned for Phase 2, implemented alongside admin chatbot in Phase 1
+
+**Schema Integrity**:
+- `chat_conversations.admin_id` is nullable (migration 0017) to allow user-side conversations
+- `chat_conversations.user_id` is nullable (migration 0016) to allow admin-side conversations
+- CHECK constraint (migration 0018) enforces exactly one of (admin_id, user_id) is non-null
+- Automated regression tests verify this constraint at the application level
 
 ---
 
@@ -514,6 +538,6 @@ backend/
 
 All code has been implemented, reviewed, and is ready for testing and deployment. No outstanding issues or incomplete sections.
 
-**Last Updated**: 2026-08-24
-**Status**: Phase 7 - Testing & Validation (In Progress) + Admin Chatbot (Phase 1) implemented
-**Next**: Chatbot v1 shipped — Groq live, history + error handling in. Restart the backend (full stop/start, not hot reload) to pick up `.env`/config changes; remaining validation is manual UX testing in the browser.
+**Last Updated**: 2026-08-27
+**Status**: Phase 7 - Testing & Validation (In Progress) + Chatbot (Admin + User) — Complete. 38 automated integration tests passing.
+**Next**: User chatbot shipped ahead of schedule (originally Phase 2). Schema integrity fixed (migration 0018 CHECK constraint). Compliance audit of tool registries against architecture docs completed — see deliverable report.

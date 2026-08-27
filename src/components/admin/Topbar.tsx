@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, BedDouble, CalendarRange, ChevronDown, Loader2, LogOut, Menu, MessageSquare, Search, Settings, UserCircle2, Users } from "lucide-react";
+import Image from "next/image";
 import { getCurrentAdmin, logout } from "@/lib/auth";
 import { apiClientFetch } from "@/lib/api-client";
 import { SearchResult } from "@/lib/types";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { Bell, BedDouble, CalendarRange, ChevronDown, Loader2, LogOut, Menu, Search, Settings, UserCircle2, Users } from "lucide-react";
 
 const resultIcons: Record<SearchResult["type"], typeof BedDouble> = {
   listing: BedDouble,
@@ -157,7 +158,14 @@ export function Topbar({
           title="Zoiko Assistant"
           className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
         >
-          <MessageSquare className="h-5 w-5" />
+          <Image
+            src="/zoikorooms-icon-png.png"
+            alt=""
+            width={40}
+            height={40}
+            priority
+            className="h-8 w-8 rounded-full object-cover"
+          />
         </button>
 
         <div className="relative">

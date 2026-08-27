@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import (
+    admin_contact,
     admin_users,
     analytics,
     authority,
@@ -29,6 +30,7 @@ from app.api.routes import (
     uploads,
     user_auth,
     user_chat,
+    user_contact,
     user_hosting,
     user_identity,
     user_payments,
@@ -97,6 +99,8 @@ app.include_router(occupancy.router)
 app.include_router(finance.router)
 app.include_router(chatbot.router)
 app.include_router(user_chat.router)
+app.include_router(user_contact.router)
+app.include_router(admin_contact.router)
 
 
 @app.get("/health")

@@ -1,6 +1,7 @@
 "use client";
 
-import { MessageSquare, X } from "lucide-react";
+import Image from "next/image";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChatLauncherFabProps {
@@ -40,14 +41,21 @@ export function ChatLauncherFab({ open, onToggle, hasUnread = false }: ChatLaunc
         !open && hasUnread && "animate-pulse-ring"
       )}
     >
-      {/* Icon morph: chat bubble ↔ close */}
+      {/* Icon morph: Zoiko logo ↔ close */}
       <span
         className={cn(
           "absolute transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
           open ? "rotate-90 scale-0 opacity-0" : "rotate-0 scale-100 opacity-100"
         )}
       >
-        <MessageSquare className="h-6 w-6" />
+        <Image
+          src="/zoikorooms-icon-png.png"
+          alt=""
+          width={28}
+          height={28}
+          priority
+          className="h-7 w-7 rounded-full object-cover"
+        />
       </span>
       <span
         className={cn(
