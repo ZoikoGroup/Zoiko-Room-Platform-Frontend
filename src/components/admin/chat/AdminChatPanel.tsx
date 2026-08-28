@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
-  Bot,
   Clock,
   History,
   Loader2,
+  Mail,
   Mic,
   Send,
   Square,
@@ -25,7 +25,9 @@ import {
   listChatConversations,
   streamChatMessage,
 } from "@/lib/chat";
+import { listContactEmails, markContactEmailRead, getUnreadCount, ContactEmail } from "@/lib/contact-email";
 import { MarkdownMessage } from "@/components/admin/chat/MarkdownMessage";
+import { AssistantAvatar } from "@/components/chat/AssistantAvatar";
 import { cn } from "@/lib/utils";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
@@ -58,13 +60,9 @@ function relativeTime(iso: string): string {
 function TypingDots() {
   return (
     <span className="flex items-center gap-1 py-1">
-      {[0, 150, 300].map((delay) => (
-        <span
-          key={delay}
-          className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 dark:bg-slate-500"
-          style={{ animationDelay: `${delay}ms` }}
-        />
-      ))}
+      <span className="typing-dot-1 h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500" />
+      <span className="typing-dot-2 h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500" />
+      <span className="typing-dot-3 h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500" />
     </span>
   );
 }
@@ -88,6 +86,11 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [connectedToast, setConnectedToast] = useState(false);
+
+  const [emailsOpen, setEmailsOpen] = useState(false);
+  const [emails, setEmails] = useState<ContactEmail[]>([]);
+  const [emailsUnread, setEmailsUnread] = useState(0);
+  const [emailsLoading, setEmailsLoading] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -133,6 +136,21 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
     if (stickToBottomRef.current) scrollToBottom();
   }, [messages, streamingText, toolActivity, scrollToBottom]);
 
+  // Poll unread contact-email count while panel is open
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    async function poll() {
+      try {
+        const { count } = await getUnreadCount();
+        if (!cancelled) setEmailsUnread(count);
+      } catch { /* ignore */ }
+    }
+    poll();
+    const id = setInterval(poll, 15000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [open]);
+
   function handleScroll() {
     const el = scrollRef.current;
     if (!el) return;
@@ -149,6 +167,24 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
         setInput(transcript);
       });
     }
+  }
+
+  async function openEmails() {
+    setEmailsOpen(true);
+    setEmailsLoading(true);
+    try {
+      const list = await listContactEmails();
+      setEmails(list);
+      setEmailsUnread(0);
+    } catch { /* ignore */ }
+    setEmailsLoading(false);
+  }
+
+  async function handleMarkEmailRead(id: number) {
+    try {
+      const updated = await markContactEmailRead(id);
+      setEmails((prev) => prev.map((e) => (e.id === id ? updated : e)));
+    } catch { /* ignore */ }
   }
 
   function startNewChat() {
@@ -205,6 +241,7 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
     const content = (contentOverride ?? input).trim();
     if (!content || sending) return;
 
+    speech.stopListening();
     abortRef.current?.abort();
     setInput("");
     setError(null);
@@ -302,25 +339,23 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
 
   return (
     <>
-      {/* Backdrop below xl -- the panel is docked (no backdrop) on >=1280px screens */}
+      {/* Click-away backdrop */}
       <button
         aria-label="Close chat"
         onClick={onClose}
-        className="fixed inset-0 z-40 bg-primary-900/40 backdrop-blur-sm xl:hidden"
+        className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]"
       />
 
       <aside
         aria-label="Zoiko admin assistant"
         className={cn(
-          "fixed inset-y-0 right-0 z-50 flex w-full flex-col overflow-hidden bg-white shadow-2xl shadow-primary-900/20 dark:bg-slate-900",
-          "sm:max-w-md sm:rounded-l-3xl xl:max-w-[448px] xl:rounded-l-none"
+          "animate-chat-panel-open fixed bottom-24 right-5 z-50 flex h-[85vh] w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-2xl shadow-primary-900/20 dark:border-white/10 dark:bg-slate-900",
+          "sm:right-6 sm:max-w-[480px]"
         )}
       >
         <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3.5 dark:border-white/10">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-700 text-white">
-              <Bot className="h-5 w-5" />
-            </span>
+            <AssistantAvatar size="md" />
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100">Zoiko Assistant</p>
               <p className="truncate text-xs text-slate-400">
@@ -329,6 +364,19 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={openEmails}
+              aria-label="Contact emails from users"
+              title="Contact Emails"
+              className="relative flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/10 dark:hover:text-slate-200"
+            >
+              <Mail className="h-[18px] w-[18px]" />
+              {emailsUnread > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-600 px-1 text-[10px] font-bold text-white">
+                  {emailsUnread > 99 ? "99+" : emailsUnread}
+                </span>
+              )}
+            </button>
             <button
               onClick={() => setHistoryOpen(true)}
               aria-label="Conversation history"
@@ -367,19 +415,18 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {messages.length === 0 && !streamingText && (
             <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
-                <Bot className="h-6 w-6" />
-              </span>
-              <p className="max-w-[280px] text-sm leading-relaxed text-slate-400">
+              <AssistantAvatar size="lg" />
+              <p className="animate-chat-fade-slide max-w-[280px] text-sm leading-relaxed text-slate-400" style={{ animationDelay: "0.08s" }}>
                 Ask me about bookings, occupancy, payments, or guests — I can look data up, but I never
                 change anything.
               </p>
               <div className="flex max-w-[320px] flex-wrap justify-center gap-2">
-                {SUGGESTED_PROMPTS.map((prompt) => (
+                {SUGGESTED_PROMPTS.map((prompt, i) => (
                   <button
                     key={prompt}
                     onClick={() => sendMessage(prompt)}
-                    className="rounded-full px-3.5 py-2 text-xs font-medium text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-300 dark:ring-white/10 dark:hover:bg-white/10"
+                    className="animate-chat-chip rounded-full px-3.5 py-2 text-xs font-medium text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-300 dark:ring-white/10 dark:hover:bg-white/10"
+                    style={{ animationDelay: `${0.15 + i * 0.06}s` }}
                   >
                     {prompt}
                   </button>
@@ -391,16 +438,14 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
           {messages.map((message) =>
             message.role === "user" ? (
               <div key={message.id} className="flex justify-end">
-                <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-primary-700 px-4 py-2.5 text-sm leading-relaxed text-white">
+                <div className="animate-chat-msg-right max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-primary-700 px-4 py-2.5 text-sm leading-relaxed text-white">
                   {message.content}
                 </div>
               </div>
             ) : (
-              <div key={message.id} className="flex flex-col">
+              <div key={message.id} className="animate-chat-msg-left flex flex-col">
                 <div className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">
-                    <Bot className="h-4 w-4" />
-                  </span>
+                  <AssistantAvatar />
                   <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-white px-4 py-2.5 text-sm leading-relaxed text-slate-700 ring-1 ring-slate-200 dark:bg-white/5 dark:text-slate-200 dark:ring-white/10">
                     <MarkdownMessage content={message.content} />
                   </div>
@@ -431,10 +476,8 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
           )}
 
           {(streamingText || waitingForFirstToken || toolActivity || toolErrors.length > 0) && (
-            <div className="flex items-start gap-2.5">
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">
-                <Bot className="h-4 w-4" />
-              </span>
+            <div className="animate-chat-msg-left flex items-start gap-2.5">
+              <AssistantAvatar />
               <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-white px-4 py-2.5 text-sm leading-relaxed text-slate-700 ring-1 ring-slate-200 dark:bg-white/5 dark:text-slate-200 dark:ring-white/10">
                 {streamingText && <MarkdownMessage content={streamingText} />}
                 {waitingForFirstToken && <TypingDots />}
@@ -541,9 +584,66 @@ export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps)
           </form>
         </footer>
 
+        {/* Contact emails overlay */}
+        {emailsOpen && (
+          <div className="animate-fade-up absolute inset-0 z-20 flex flex-col rounded-2xl bg-white dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-white/10">
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Contact Emails</p>
+              <button
+                onClick={() => setEmailsOpen(false)}
+                aria-label="Close emails"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/10 dark:hover:text-slate-200"
+              >
+                <X className="h-[18px] w-[18px]" />
+              </button>
+            </div>
+            <div className="flex-1 space-y-1 overflow-y-auto p-3">
+              {emailsLoading && (
+                <p className="px-3 py-8 text-center text-sm text-slate-400">Loading...</p>
+              )}
+              {!emailsLoading && emails.length === 0 && (
+                <p className="px-3 py-8 text-center text-sm text-slate-400">No messages from users yet.</p>
+              )}
+              {!emailsLoading && emails.map((email) => (
+                <div
+                  key={email.id}
+                  className={cn(
+                    "rounded-xl border px-3.5 py-3 transition-colors",
+                    email.isRead
+                      ? "border-slate-100 bg-white dark:border-white/5 dark:bg-white/[0.02]"
+                      : "border-primary-200 bg-primary-50/50 dark:border-primary-500/20 dark:bg-primary-500/5"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                        {email.subject}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {email.userName || email.userEmail} &middot; {relativeTime(email.createdAt)}
+                      </p>
+                    </div>
+                    {!email.isRead && (
+                      <button
+                        onClick={() => handleMarkEmailRead(email.id)}
+                        className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-medium text-primary-600 hover:bg-primary-100 dark:text-primary-400 dark:hover:bg-primary-500/10"
+                      >
+                        Mark read
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                    {email.message}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Conversation history slide-over */}
         {historyOpen && (
-          <div className="animate-fade-up absolute inset-0 z-20 flex flex-col bg-white dark:bg-slate-900">
+          <div className="animate-fade-up absolute inset-0 z-20 flex flex-col rounded-2xl bg-white dark:bg-slate-900">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-white/10">
               <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Conversations</p>
               <button
