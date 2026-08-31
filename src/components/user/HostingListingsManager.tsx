@@ -24,6 +24,13 @@ import {
 import { IdentityGate } from "@/components/user/IdentityGate";
 import { useUserSession } from "@/components/user/UserSessionContext";
 import { Card, EmptyState, Field, SectionHeading, Toast, inputClass, useToast } from "@/components/user/ui";
+import { ImageGalleryUploader } from "@/components/admin/ImageGalleryUploader";
+
+const MAX_LISTING_IMAGES = 10;
+
+// Mirrors backend SUPPORTED_CURRENCIES (app/models/listing.py) -- kept in sync by hand
+// since currency validation happens server-side and this is just the picker.
+const SUPPORTED_CURRENCIES = ["INR", "GBP", "USD", "EUR", "CAD", "AUD", "AED", "SGD", "NZD"];
 
 interface ListingFormState {
   id: string | null;
@@ -33,6 +40,7 @@ interface ListingFormState {
   city: string;
   location: string;
   pricePerNight: string;
+  currency: string;
   guests: string;
   bedrooms: string;
   bathrooms: string;
@@ -40,7 +48,7 @@ interface ListingFormState {
   minStayNights: string;
   description: string;
   amenities: string;
-  images: string;
+  images: string[];
   contactName: string;
   contactPhone: string;
   contactEmail: string;
@@ -55,6 +63,7 @@ function emptyForm(contact: { name: string; phone: string; email: string }): Lis
     city: "",
     location: "",
     pricePerNight: "",
+    currency: "INR",
     guests: "1",
     bedrooms: "1",
     bathrooms: "1",
@@ -62,7 +71,7 @@ function emptyForm(contact: { name: string; phone: string; email: string }): Lis
     minStayNights: "30",
     description: "",
     amenities: "",
-    images: "",
+    images: [],
     contactName: contact.name,
     contactPhone: contact.phone,
     contactEmail: contact.email,
@@ -78,6 +87,7 @@ function toFormState(listing: HostedListing): ListingFormState {
     city: listing.city,
     location: listing.location,
     pricePerNight: String(listing.pricePerNight),
+    currency: listing.currency,
     guests: String(listing.guests),
     bedrooms: String(listing.bedrooms),
     bathrooms: String(listing.bathrooms),
@@ -85,7 +95,7 @@ function toFormState(listing: HostedListing): ListingFormState {
     minStayNights: String(listing.minStayNights),
     description: listing.description,
     amenities: listing.amenities.join(", "),
-    images: listing.images.join(", "),
+    images: listing.images,
     contactName: listing.contactName,
     contactPhone: listing.contactPhone,
     contactEmail: listing.contactEmail,
@@ -189,13 +199,14 @@ export function HostingListingsManager() {
       city: form.city.trim(),
       location: form.location.trim(),
       pricePerNight: price,
+      currency: form.currency,
       guests: Math.max(1, Number(form.guests) || 1),
       bedrooms: Number(form.bedrooms) || 0,
       bathrooms: Number(form.bathrooms) || 1,
       size: Number(form.size) || 0,
       description: form.description.trim(),
       amenities: splitList(form.amenities),
-      images: splitList(form.images),
+      images: form.images,
       minStayNights: Math.round(minStay),
       roomId,
       contactName: form.contactName.trim(),
@@ -321,7 +332,7 @@ export function HostingListingsManager() {
                       <span className="flex items-center gap-1">
                         <MapPin className="h-3 w-3" /> {listing.location}, {listing.city}
                       </span>
-                      <span>{formatCurrency(listing.pricePerNight)} / night</span>
+                      <span>{formatCurrency(listing.pricePerNight, listing.currency)} / night</span>
                       <span>Min. {listing.minStayNights} nights</span>
                       {listing.roomId !== null && <span>Room #{listing.roomId}</span>}
                       <span className="text-slate-300 dark:text-slate-600">{listing.id}</span>
@@ -444,7 +455,7 @@ export function HostingListingsManager() {
                 className={inputClass}
               />
             </Field>
-            <Field label="Price per night (INR)">
+            <Field label="Price per night">
               <input
                 inputMode="decimal"
                 value={form?.pricePerNight ?? ""}
@@ -452,6 +463,19 @@ export function HostingListingsManager() {
                 placeholder="1800"
                 className={inputClass}
               />
+            </Field>
+            <Field label="Currency">
+              <select
+                value={form?.currency ?? "INR"}
+                onChange={(e) => setForm((f) => (f ? { ...f, currency: e.target.value } : f))}
+                className={inputClass}
+              >
+                {SUPPORTED_CURRENCIES.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Minimum stay (nights)" hint="30 or more.">
               <input
@@ -513,12 +537,12 @@ export function HostingListingsManager() {
             />
           </Field>
 
-          <Field label="Image URLs" hint="Comma separated links to photos of the room.">
-            <input
-              value={form?.images ?? ""}
-              onChange={(e) => setForm((f) => (f ? { ...f, images: e.target.value } : f))}
-              placeholder="https://..., https://..."
-              className={inputClass}
+          <Field label="Room photos" hint="Upload photos of the room. The first photo is used as the cover image.">
+            <ImageGalleryUploader
+              images={form?.images ?? []}
+              onChange={(images) => setForm((f) => (f ? { ...f, images } : f))}
+              uploadUrl="/api/users/hosting/uploads/images"
+              maxImages={MAX_LISTING_IMAGES}
             />
           </Field>
 

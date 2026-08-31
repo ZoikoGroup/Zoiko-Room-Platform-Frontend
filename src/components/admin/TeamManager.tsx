@@ -11,7 +11,7 @@ import { getCurrentAdmin } from "@/lib/auth";
 import { apiClientFetch, ApiError } from "@/lib/api-client";
 import { AdminRole, AdminUserSummary, Listing } from "@/lib/types";
 import { listingStateLabel, listingStateTone } from "@/lib/status";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, resolveImageUrl } from "@/lib/utils";
 
 const emptyAdminForm = { email: "", password: "", fullName: "", phone: "", role: "admin" as AdminRole };
 
@@ -328,7 +328,7 @@ export function TeamManager() {
                 className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100 dark:bg-slate-800 dark:ring-white/10"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={listing.images[0]} alt={listing.name} className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+                <img src={resolveImageUrl(listing.images[0])} alt={listing.name} className="h-14 w-14 shrink-0 rounded-lg object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-primary-900 dark:text-white">{listing.name}</p>
                   <p className="truncate text-xs text-slate-500 dark:text-slate-400">{listing.city}</p>
@@ -336,7 +336,7 @@ export function TeamManager() {
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                   <span className="text-sm font-bold text-primary-800 dark:text-primary-200">
-                    {formatCurrency(listing.pricePerNight)}
+                    {formatCurrency(listing.pricePerNight, listing.currency)}
                   </span>
                   <Badge tone={listingStateTone[listing.state]}>{listingStateLabel[listing.state]}</Badge>
                 </div>

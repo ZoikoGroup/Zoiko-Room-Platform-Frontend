@@ -199,6 +199,7 @@ export interface HostedListingInput {
   city: string;
   location: string;
   pricePerNight: number;
+  currency: string;
   guests: number;
   bedrooms: number;
   bathrooms: number;

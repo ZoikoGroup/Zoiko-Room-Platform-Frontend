@@ -10,6 +10,10 @@ class ListingBase(CamelModel):
     latitude: float | None = None
     longitude: float | None = None
     price_per_night: float
+    # ISO-4217-style 3-letter code, validated server-side against
+    # models.listing.SUPPORTED_CURRENCIES. Defaulting to "INR" here keeps every
+    # existing caller that doesn't send this field working unchanged.
+    currency: str = "INR"
     guests: int
     bedrooms: int = 0
     bathrooms: int = 1
@@ -37,6 +41,7 @@ class ListingUpdate(CamelModel):
     latitude: float | None = None
     longitude: float | None = None
     price_per_night: float | None = None
+    currency: str | None = None
     guests: int | None = None
     bedrooms: int | None = None
     bathrooms: int | None = None
