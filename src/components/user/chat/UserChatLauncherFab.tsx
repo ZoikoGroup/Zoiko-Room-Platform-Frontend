@@ -1,6 +1,7 @@
 "use client";
 
-import { MessageSquare, X } from "lucide-react";
+import Image from "next/image";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface UserChatLauncherFabProps {
@@ -31,7 +32,14 @@ export function UserChatLauncherFab({ open, onToggle, hasUnread = false }: UserC
           open ? "rotate-90 scale-0 opacity-0" : "rotate-0 scale-100 opacity-100"
         )}
       >
-        <MessageSquare className="h-6 w-6" />
+        <Image
+          src="/zoikorooms-icon-png.png"
+          alt=""
+          width={28}
+          height={28}
+          priority
+          className="h-7 w-7 rounded-full object-cover"
+        />
       </span>
       <span
         className={cn(
