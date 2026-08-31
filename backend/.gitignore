@@ -7,3 +7,6 @@ __pycache__/
 uploads/
 secure_uploads/
 dev_mail_outbox/
+.env
+.env.*
+!.env.example

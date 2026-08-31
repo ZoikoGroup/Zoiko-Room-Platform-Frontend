@@ -15,9 +15,11 @@ from app.crud.events import emit_event
 from app.crud.eligibility import check_offer_eligibility
 from app.crud.identity_verification import get_verified_identity_for_party
 from app.crud.ids import dicebear_avatar, new_id
+from app.crud import notification as notif_crud
 from app.db.session import get_db
 from app.models.guest import Guest
 from app.models.leasing import Application
+from app.models.listing import Listing
 from app.models.occupancy import Occupancy
 from app.models.user_account import UserAccount
 from app.schemas.leasing import UserApplicationRead, UserApplicationSubmitRequest, UserOccupancyRead, SubletRequestCreate, SubletRequestRead
@@ -74,6 +76,24 @@ def submit_rental_application(
     try:
         application = leasing_crud.submit_application(db, app_data)
         log_audit_event(db, None, "user_application.submit", "application", str(application.id), get_correlation_id(request), reason=f"user:{user.id}")
+
+        listing = db.get(Listing, application.listing_id)
+        if listing and listing.party_id:
+            notif_crud.notify_user_by_party(
+                db, listing.party_id,
+                title="New rental application",
+                message=f"{user.full_name} applied for your listing \"{listing.name}\".",
+                notification_type="application.received",
+                related_entity_type="application", related_entity_id=str(application.id),
+            )
+        notif_crud.notify_all_super_admins(
+            db,
+            title="New rental application submitted",
+            message=f"{user.full_name} applied for listing {application.listing_id}.",
+            notification_type="application.submitted",
+            related_entity_type="application", related_entity_id=str(application.id),
+        )
+
         db.commit()
 
         return UserApplicationRead(

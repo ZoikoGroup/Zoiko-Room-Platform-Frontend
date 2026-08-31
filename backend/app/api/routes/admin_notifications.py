@@ -1,0 +1,39 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_admin
+from app.crud import notification as crud
+from app.db.session import get_db
+from app.models.admin_user import AdminUser
+from app.schemas.notification import NotificationRead, UnreadCountRead
+
+# Shared by both "admin" and "super_admin" roles -- every query below is scoped to
+# the caller's own admin.id, so a regular admin can never see another admin's rows
+# and, since only super admins are ever fanned out super-admin-only notifications
+# (see crud.notify_all_super_admins), a regular admin simply has none of those rows
+# to begin with. No role check is needed here beyond "is a logged-in admin."
+router = APIRouter(prefix="/api/notifications", tags=["admin-notifications"], dependencies=[Depends(get_current_admin)])
+
+
+@router.get("", response_model=list[NotificationRead])
+def list_notifications(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    return crud.list_for_admin(db, admin.id)
+
+
+@router.get("/unread-count", response_model=UnreadCountRead)
+def get_unread_count(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    return UnreadCountRead(count=crud.count_unread_for_admin(db, admin.id))
+
+
+@router.patch("/{notification_id}/read", response_model=NotificationRead)
+def mark_read(notification_id: int, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    notification = crud.mark_read_for_admin(db, notification_id, admin.id)
+    if not notification:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Notification not found")
+    return notification
+
+
+@router.patch("/read-all")
+def mark_all_read(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    updated = crud.mark_all_read_for_admin(db, admin.id)
+    return {"updated": updated}

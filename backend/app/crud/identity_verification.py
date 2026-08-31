@@ -4,6 +4,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.mailer import send_identity_verification_approved_email, send_identity_verification_rejected_email
+from app.crud import notification as notif_crud
 from app.crud.party import get_or_create_default_party
 from app.models.admin_user import AdminUser
 from app.models.identity_verification import DOCUMENT_CATEGORY_BY_TYPE, IdentityVerification, DOCUMENT_TYPES, IDENTITY_STATUSES
@@ -64,6 +66,10 @@ def submit_identity_verification(db: Session, admin: AdminUser, data: IdentityVe
     return record
 
 
+def _user_for_party(db: Session, party_id: int) -> UserAccount | None:
+    return db.scalar(select(UserAccount).where(UserAccount.party_id == party_id, UserAccount.is_active.is_(True)))
+
+
 def verify_identity_verification(db: Session, record: IdentityVerification, verifier: AdminUser) -> IdentityVerification:
     if verifier.role != "super_admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Super admin access required")
@@ -73,8 +79,22 @@ def verify_identity_verification(db: Session, record: IdentityVerification, veri
     record.expires_at = now + timedelta(days=IDENTITY_VERIFICATION_VALIDITY_DAYS)
     record.verifier_admin_id = verifier.id
     record.updated_at = now
+
+    user = _user_for_party(db, record.party_id)
+    if user:
+        notif_crud.notify_user(
+            db, user.id,
+            title="Identity verified",
+            message="Your identity document has been approved. You can now apply to rent or publish a listing.",
+            notification_type="identity_verification.approved",
+            related_entity_type="identity_verification", related_entity_id=str(record.id),
+        )
+
     db.commit()
     db.refresh(record)
+
+    if user:
+        send_identity_verification_approved_email(user.email, user.full_name)
     return record
 
 
@@ -88,8 +108,22 @@ def reject_identity_verification(
     record.verifier_admin_id = verifier.id
     record.verifier_notes = notes
     record.updated_at = now
+
+    user = _user_for_party(db, record.party_id)
+    if user:
+        notif_crud.notify_user(
+            db, user.id,
+            title="Identity verification rejected",
+            message=notes or "Your identity document could not be verified. Please submit a new document.",
+            notification_type="identity_verification.rejected",
+            related_entity_type="identity_verification", related_entity_id=str(record.id),
+        )
+
     db.commit()
     db.refresh(record)
+
+    if user:
+        send_identity_verification_rejected_email(user.email, user.full_name, notes)
     return record
 
 
@@ -142,6 +176,16 @@ def submit_identity_verification_for_user(
         status="pending",
     )
     db.add(record)
+    db.flush()
+
+    notif_crud.notify_all_super_admins(
+        db,
+        title="Identity verification pending review",
+        message=f"{user_account.full_name} submitted a {document_type.replace('_', ' ')} for review.",
+        notification_type="identity_verification.submitted",
+        related_entity_type="identity_verification", related_entity_id=str(record.id),
+    )
+
     db.commit()
     db.refresh(record)
     return record

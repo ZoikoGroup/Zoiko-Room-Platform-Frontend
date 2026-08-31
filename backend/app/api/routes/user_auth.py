@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import USER_COOKIE_NAME, get_current_user
 from app.core.config import settings
-from app.core.mailer import send_password_reset_email
+from app.core.mailer import send_email, send_password_reset_email
 from app.core.security import create_access_token, verify_password
+from app.crud import notification as notif_crud
 from app.crud.password_reset import create_reset_token, reset_password_with_token
 from app.crud.user import (
     authenticate_user,
@@ -56,6 +57,24 @@ def register_user(payload: UserRegisterRequest, db: Session = Depends(get_db)):
 
     try:
         user = create_user(db, payload.email, payload.password, payload.full_name, payload.phone)
+        notif_crud.notify_user(
+            db, user.id,
+            title="Welcome to Zoiko Rooms",
+            message="Your account is ready. Verify your identity to start renting or hosting.",
+            notification_type="user.registered",
+        )
+        db.commit()
+        send_email(
+            user.email,
+            "Welcome to Zoiko Rooms",
+            heading=f"Welcome, {user.full_name.split(' ')[0]}!",
+            body_lines=[
+                "Your Zoiko Rooms account is ready.",
+                "Verify your identity to apply for a room or start hosting one of your own.",
+            ],
+            cta_label="Verify your identity",
+            cta_url=f"{settings.frontend_url}/account/identity",
+        )
         return UserRegisterResponse(message="Registration successful", user_id=user.id)
     except ValueError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))

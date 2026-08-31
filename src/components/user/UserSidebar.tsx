@@ -12,6 +12,7 @@ import {
   DoorOpen,
   LayoutDashboard,
   LogOut,
+  MessageCircle,
   Repeat,
   Search,
   ShieldCheck,
@@ -25,29 +26,29 @@ import { userLogout } from "@/lib/user-auth";
 const navGroups = [
   {
     label: "",
-    items: [{ href: "/account", label: "Overview", icon: LayoutDashboard }],
+    items: [{ href: "/account", label: "Dashboard", icon: LayoutDashboard }],
   },
   {
-    label: "Renting",
+    label: "RENT",
     items: [
-      { href: "/account/rent", label: "Rent a Room", icon: Search },
+      { href: "/account/rent", label: "Find a Room", icon: Search },
       { href: "/account/applications", label: "My Applications", icon: ClipboardList },
       { href: "/account/rentals", label: "My Rentals", icon: DoorOpen },
       { href: "/account/sublets", label: "Sublet Requests", icon: Repeat },
     ],
   },
   {
-    label: "Hosting",
+    label: "HOST",
     items: [
       { href: "/account/host", label: "My Properties", icon: Building2 },
       { href: "/account/host/listings", label: "My Listings", icon: BedDouble },
     ],
   },
   {
-    label: "Account",
+    label: "ACCOUNT",
     items: [
       { href: "/account/identity", label: "Identity Verification", icon: ShieldCheck },
-      { href: "/account/payments", label: "Payment History", icon: CreditCard },
+      { href: "/account/payments", label: "Payments", icon: CreditCard },
       { href: "/account/profile", label: "Profile", icon: UserCircle2 },
     ],
   },
@@ -58,11 +59,15 @@ export function UserSidebar({
   onToggleCollapse,
   mobileOpen,
   onCloseMobile,
+  onOpenChat,
 }: {
   collapsed: boolean;
   onToggleCollapse: () => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  /** Opens the existing USER chat panel (rendered by the account shell layout) --
+   *  this sidebar never renders chat UI itself, just triggers it. */
+  onOpenChat: () => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -167,9 +172,24 @@ export function UserSidebar({
           ))}
         </nav>
 
-        <div className="relative border-t border-white/10 p-3">
+        <div className="relative space-y-1 border-t border-white/10 p-3">
+          <button
+            onClick={() => {
+              onOpenChat();
+              onCloseMobile();
+            }}
+            title={collapsed ? "Support / Chat" : undefined}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-primary-200 transition-colors hover:bg-white/10 hover:text-white",
+              collapsed && "lg:justify-center"
+            )}
+          >
+            <MessageCircle className="h-[18px] w-[18px] shrink-0" />
+            <span className={cn(collapsed && "lg:hidden")}>Support / Chat</span>
+          </button>
           <button
             onClick={handleLogout}
+            title={collapsed ? "Logout" : undefined}
             className={cn(
               "flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-primary-200 transition-colors hover:bg-accent-600/90 hover:text-white",
               collapsed && "lg:justify-center"

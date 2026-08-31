@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
-  Bot,
   Clock,
   History,
   Loader2,
+  Mail,
   Mic,
   Send,
   Square,
@@ -26,6 +26,8 @@ import {
   streamUserChatMessage,
 } from "@/lib/user-chat";
 import { MarkdownMessage } from "@/components/admin/chat/MarkdownMessage";
+import { AssistantAvatar } from "@/components/chat/AssistantAvatar";
+import { sendContactEmail } from "@/lib/contact-email";
 import { cn } from "@/lib/utils";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useSpeechSynthesis } from "@/hooks/useSpeechSynthesis";
@@ -58,18 +60,14 @@ function relativeTime(iso: string): string {
 function TypingDots() {
   return (
     <span className="flex items-center gap-1 py-1">
-      {[0, 150, 300].map((delay) => (
-        <span
-          key={delay}
-          className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 dark:bg-slate-500"
-          style={{ animationDelay: `${delay}ms` }}
-        />
-      ))}
+      <span className="typing-dot-1 h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500" />
+      <span className="typing-dot-2 h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500" />
+      <span className="typing-dot-3 h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500" />
     </span>
   );
 }
 
-export function UserChatPanel({ open, onClose, onUnread }: UserChatPanelProps) {
+export function UserChatPanel({ open, onClose }: UserChatPanelProps) {
   const [conversations, setConversations] = useState<UserChatConversation[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [activeTitle, setActiveTitle] = useState<string>("");
@@ -88,6 +86,13 @@ export function UserChatPanel({ open, onClose, onUnread }: UserChatPanelProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [connectedToast, setConnectedToast] = useState(false);
+
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactSubject, setContactSubject] = useState("");
+  const [contactMessage, setContactMessage] = useState("");
+  const [contactSending, setContactSending] = useState(false);
+  const [contactSent, setContactSent] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -164,6 +169,22 @@ export function UserChatPanel({ open, onClose, onUnread }: UserChatPanelProps) {
     setHistoryOpen(false);
   }
 
+  async function handleContactSend() {
+    if (!contactSubject.trim() || !contactMessage.trim()) return;
+    setContactSending(true);
+    setContactError(null);
+    try {
+      await sendContactEmail(contactSubject.trim(), contactMessage.trim());
+      setContactSent(true);
+      setContactSubject("");
+      setContactMessage("");
+    } catch {
+      setContactError("Failed to send. Please try again.");
+    } finally {
+      setContactSending(false);
+    }
+  }
+
   async function selectConversation(id: number) {
     abortRef.current?.abort();
     synthesis.stop();
@@ -202,6 +223,7 @@ export function UserChatPanel({ open, onClose, onUnread }: UserChatPanelProps) {
     const content = (contentOverride ?? input).trim();
     if (!content || sending) return;
 
+    speech.stopListening();
     abortRef.current?.abort();
     setInput("");
     setError(null);
@@ -299,24 +321,23 @@ export function UserChatPanel({ open, onClose, onUnread }: UserChatPanelProps) {
 
   return (
     <>
+      {/* Click-away backdrop */}
       <button
         aria-label="Close chat"
         onClick={onClose}
-        className="fixed inset-0 z-40 bg-primary-900/40 backdrop-blur-sm xl:hidden"
+        className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]"
       />
 
       <aside
         aria-label="Zoiko assistant"
         className={cn(
-          "fixed inset-y-0 right-0 z-50 flex w-full flex-col overflow-hidden bg-white shadow-2xl shadow-primary-900/20 dark:bg-slate-900",
-          "sm:max-w-md sm:rounded-l-3xl xl:max-w-[448px] xl:rounded-l-none"
+          "animate-chat-panel-open fixed bottom-24 right-5 z-50 flex h-[85vh] w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-2xl shadow-primary-900/20 dark:border-white/10 dark:bg-slate-900",
+          "sm:right-6 sm:max-w-[480px]"
         )}
       >
         <header className="flex items-center justify-between border-b border-slate-100 px-4 py-3.5 dark:border-white/10">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-700 text-white">
-              <Bot className="h-5 w-5" />
-            </span>
+            <AssistantAvatar size="md" />
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100">Zoiko Assistant</p>
               <p className="truncate text-xs text-slate-400">
@@ -342,6 +363,14 @@ export function UserChatPanel({ open, onClose, onUnread }: UserChatPanelProps) {
               <SquarePen className="h-[18px] w-[18px]" />
             </button>
             <button
+              onClick={() => { setContactOpen(true); setContactSent(false); setContactError(null); }}
+              aria-label="Contact admin"
+              title="Contact Admin"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/10 dark:hover:text-slate-200"
+            >
+              <Mail className="h-[18px] w-[18px]" />
+            </button>
+            <button
               onClick={onClose}
               aria-label="Close chat"
               title="Close"
@@ -362,18 +391,17 @@ export function UserChatPanel({ open, onClose, onUnread }: UserChatPanelProps) {
         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {messages.length === 0 && !streamingText && (
             <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
-                <Bot className="h-6 w-6" />
-              </span>
-              <p className="max-w-[280px] text-sm leading-relaxed text-slate-400">
+              <AssistantAvatar size="lg" />
+              <p className="animate-chat-fade-slide max-w-[280px] text-sm leading-relaxed text-slate-400" style={{ animationDelay: "0.08s" }}>
                 Ask me about available rooms, your applications, payments, or anything about your stay — I&apos;m here to help.
               </p>
               <div className="flex max-w-[320px] flex-wrap justify-center gap-2">
-                {SUGGESTED_PROMPTS.map((prompt) => (
+                {SUGGESTED_PROMPTS.map((prompt, i) => (
                   <button
                     key={prompt}
                     onClick={() => sendMessage(prompt)}
-                    className="rounded-full px-3.5 py-2 text-xs font-medium text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-300 dark:ring-white/10 dark:hover:bg-white/10"
+                    className="animate-chat-chip rounded-full px-3.5 py-2 text-xs font-medium text-slate-600 ring-1 ring-slate-200 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-300 dark:ring-white/10 dark:hover:bg-white/10"
+                    style={{ animationDelay: `${0.15 + i * 0.06}s` }}
                   >
                     {prompt}
                   </button>
@@ -385,16 +413,14 @@ export function UserChatPanel({ open, onClose, onUnread }: UserChatPanelProps) {
           {messages.map((message) =>
             message.role === "user" ? (
               <div key={message.id} className="flex justify-end">
-                <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-primary-700 px-4 py-2.5 text-sm leading-relaxed text-white">
+                <div className="animate-chat-msg-right max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-primary-700 px-4 py-2.5 text-sm leading-relaxed text-white">
                   {message.content}
                 </div>
               </div>
             ) : (
-              <div key={message.id} className="flex flex-col">
+              <div key={message.id} className="animate-chat-msg-left flex flex-col">
                 <div className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">
-                    <Bot className="h-4 w-4" />
-                  </span>
+                  <AssistantAvatar />
                   <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-white px-4 py-2.5 text-sm leading-relaxed text-slate-700 ring-1 ring-slate-200 dark:bg-white/5 dark:text-slate-200 dark:ring-white/10">
                     <MarkdownMessage content={message.content} />
                   </div>
@@ -425,10 +451,8 @@ export function UserChatPanel({ open, onClose, onUnread }: UserChatPanelProps) {
           )}
 
           {(streamingText || waitingForFirstToken || toolActivity || toolErrors.length > 0) && (
-            <div className="flex items-start gap-2.5">
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">
-                <Bot className="h-4 w-4" />
-              </span>
+            <div className="animate-chat-msg-left flex items-start gap-2.5">
+              <AssistantAvatar />
               <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-white px-4 py-2.5 text-sm leading-relaxed text-slate-700 ring-1 ring-slate-200 dark:bg-white/5 dark:text-slate-200 dark:ring-white/10">
                 {streamingText && <MarkdownMessage content={streamingText} />}
                 {waitingForFirstToken && <TypingDots />}
@@ -535,8 +559,79 @@ export function UserChatPanel({ open, onClose, onUnread }: UserChatPanelProps) {
           </form>
         </footer>
 
+        {contactOpen && (
+          <div className="animate-fade-up absolute inset-0 z-20 flex flex-col rounded-2xl bg-white dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-white/10">
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Contact Admin</p>
+              <button
+                onClick={() => setContactOpen(false)}
+                aria-label="Close"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/10 dark:hover:text-slate-200"
+              >
+                <X className="h-[18px] w-[18px]" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              {contactSent ? (
+                <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+                    <Mail className="h-6 w-6" />
+                  </span>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Message sent to admin</p>
+                  <p className="text-xs text-slate-400">We&apos;ll get back to you as soon as possible.</p>
+                  <button
+                    onClick={() => { setContactSent(false); setContactOpen(false); }}
+                    className="mt-2 rounded-xl bg-primary-700 px-4 py-2 text-xs font-semibold text-white hover:bg-primary-800"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  <p className="text-xs leading-relaxed text-slate-400">
+                    Couldn&apos;t find what you needed? Send a message directly to our admin team.
+                  </p>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Subject</label>
+                    <input
+                      type="text"
+                      value={contactSubject}
+                      onChange={(e) => setContactSubject(e.target.value)}
+                      placeholder="What do you need help with?"
+                      maxLength={255}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-primary-400 focus:ring-1 focus:ring-primary-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Message</label>
+                    <textarea
+                      value={contactMessage}
+                      onChange={(e) => setContactMessage(e.target.value)}
+                      placeholder="Describe your question or issue in detail..."
+                      rows={5}
+                      className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-primary-400 focus:ring-1 focus:ring-primary-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                    />
+                  </div>
+                  {contactError && (
+                    <p className="flex items-center gap-1.5 text-xs text-accent-600 dark:text-accent-400">
+                      <AlertTriangle className="h-3.5 w-3.5" /> {contactError}
+                    </p>
+                  )}
+                  <button
+                    onClick={handleContactSend}
+                    disabled={contactSending || !contactSubject.trim() || !contactMessage.trim()}
+                    className="self-end rounded-xl bg-primary-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-800 disabled:opacity-50"
+                  >
+                    {contactSending ? "Sending..." : "Send to Admin"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {historyOpen && (
-          <div className="animate-fade-up absolute inset-0 z-20 flex flex-col bg-white dark:bg-slate-900">
+          <div className="animate-fade-up absolute inset-0 z-20 flex flex-col rounded-2xl bg-white dark:bg-slate-900">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-white/10">
               <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Conversations</p>
               <button

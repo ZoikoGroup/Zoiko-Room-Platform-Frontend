@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Float, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -14,9 +14,17 @@ LISTING_STATES = ("DRAFT", "EVIDENCE_PENDING", "REVIEW", "PUBLISHED", "PAUSED", 
 
 class Listing(Base):
     __tablename__ = "listings"
+    # 0001_initial.py created a table-level UNIQUE constraint on slug plus a
+    # separately named plain index (not a combined unique index) -- declared
+    # explicitly here, matching the two real objects in the database, so
+    # `alembic check` doesn't report a phantom constraint-vs-index diff.
+    __table_args__ = (
+        UniqueConstraint("slug", name="listings_slug_key"),
+        Index("ix_listings_slug", "slug"),
+    )
 
     id: Mapped[str] = mapped_column(String(20), primary_key=True)
-    slug: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     property_type: Mapped[str] = mapped_column(String(20), default="private_room")
     room_type: Mapped[str] = mapped_column(String(255), nullable=False)
