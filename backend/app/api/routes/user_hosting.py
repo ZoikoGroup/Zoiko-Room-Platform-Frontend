@@ -8,6 +8,7 @@ from app.core.correlation import get_correlation_id
 from app.crud.audit import log_audit_event
 from app.crud.events import emit_event
 from app.crud import listing as listing_crud
+from app.crud import notification as notification_crud
 from app.crud.property import get_property, list_rooms_for_property
 from app.db.session import get_db
 from app.models.user_account import UserAccount
@@ -172,6 +173,28 @@ def _get_user_listing_or_404(db: Session, listing_id: str, user: UserAccount):
     return listing
 
 
+@router.get("/listings", response_model=list[ListingRead])
+def list_user_listings(
+    user: UserAccount = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List every listing (draft or published) owned by the current user's party.
+    Backs the "My Listings" page -- previously there was no way to read a host's
+    own drafts back, so the frontend cached write results in localStorage as a
+    stopgap. That stopgap is no longer needed now that this exists."""
+    if not user.party_id:
+        return []
+    from sqlalchemy import select
+    from app.models.listing import Listing
+
+    listings = list(
+        db.scalars(
+            select(Listing).where(Listing.party_id == user.party_id).order_by(Listing.id.desc())
+        )
+    )
+    return listings
+
+
 @router.post("/listings", response_model=ListingRead, status_code=status.HTTP_201_CREATED)
 def create_user_listing(
     payload: ListingCreate,
@@ -226,5 +249,19 @@ def publish_user_listing(
     updated = listing_crud.publish_listing(db, listing)
     log_audit_event(db, None, "user_listing.publish", "listing", listing_id, get_correlation_id(request), reason=f"user:{user.id}")
     emit_event(db, "listing.published", "listing", listing_id, {"room_id": updated.room_id, "partyId": user.party_id})
+    notification_crud.notify_user(
+        db, user.id,
+        title="Listing published",
+        message=f'"{updated.name}" is now live on the marketplace.',
+        notification_type="listing.published",
+        related_entity_type="listing", related_entity_id=listing_id,
+    )
+    notification_crud.notify_all_super_admins(
+        db,
+        title="New listing published",
+        message=f'{user.full_name} published "{updated.name}".',
+        notification_type="listing.published",
+        related_entity_type="listing", related_entity_id=listing_id,
+    )
     db.commit()
     return updated

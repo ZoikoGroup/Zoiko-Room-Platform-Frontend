@@ -20,6 +20,7 @@ def _set_auth_cookie(response: Response, email: str) -> None:
         httponly=True,
         secure=settings.cookie_secure,
         samesite="lax",
+        domain=".zoikorooms.com",
         max_age=settings.jwt_expire_minutes * 60,
         path="/",
     )

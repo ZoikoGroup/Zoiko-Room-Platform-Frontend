@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.eligibility import check_agreement_eligibility, check_offer_eligibility
 from app.crud.ids import dicebear_avatar, new_id
+from app.crud import notification as notif_crud
 from app.crud.party import assert_provider_access, party_id_for_listing
 from app.models.admin_user import AdminUser
 from app.models.finance import OBLIGATION_TYPE_TO_PLANE, Obligation
@@ -147,6 +148,18 @@ def decide_application(db: Session, application: Application, admin: AdminUser, 
     db.add(decision)
     application.status = "DECIDED"
     application.updated_at = datetime.now(timezone.utc)
+
+    guest = db.get(Guest, application.guest_id)
+    if guest:
+        verb = "approved" if data.decision == "APPROVED" else "rejected"
+        notif_crud.notify_user_by_guest_email(
+            db, guest.email,
+            title=f"Your rental application was {verb}",
+            message=data.note or f"Your application for listing {application.listing_id} was {verb}.",
+            notification_type=f"application.{verb}",
+            related_entity_type="application", related_entity_id=str(application.id),
+        )
+
     db.commit()
     db.refresh(decision)
     return decision

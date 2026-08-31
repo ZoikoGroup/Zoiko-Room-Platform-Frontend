@@ -54,7 +54,7 @@ export function UserDashboardHome() {
     { href: "/account/rentals", label: "My Rentals", icon: DoorOpen, count: counts.rentals },
     { href: "/account/sublets", label: "Sublet Requests", icon: Repeat, count: counts.sublets },
     { href: "/account/host", label: "My Properties", icon: Building2, count: counts.properties },
-    { href: "/account/payments", label: "Payment History", icon: CreditCard, count: counts.payments },
+    { href: "/account/payments", label: "Payments", icon: CreditCard, count: counts.payments },
   ];
 
   return (
@@ -100,7 +100,7 @@ export function UserDashboardHome() {
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20">
               <Search className="h-6 w-6" />
             </span>
-            <h2 className="mt-5 font-heading text-xl font-extrabold">Rent a property / room</h2>
+            <h2 className="mt-5 font-heading text-xl font-extrabold">Find a Room</h2>
             <p className="mt-1.5 max-w-sm text-sm text-primary-200">
               Browse verified private rooms available for 30+ night stays and apply to the one you want.
             </p>
@@ -120,12 +120,12 @@ export function UserDashboardHome() {
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25">
               <Building2 className="h-6 w-6" />
             </span>
-            <h2 className="mt-5 font-heading text-xl font-extrabold">Host a property / room</h2>
+            <h2 className="mt-5 font-heading text-xl font-extrabold">Become a Host</h2>
             <p className="mt-1.5 max-w-sm text-sm text-accent-50">
               Add your property, list a room, and publish it once every compliance check passes.
             </p>
             <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-white transition-transform duration-300 group-hover:translate-x-1">
-              Start hosting <ArrowRight className="h-4 w-4" />
+              Manage your property <ArrowRight className="h-4 w-4" />
             </span>
           </div>
         </Link>

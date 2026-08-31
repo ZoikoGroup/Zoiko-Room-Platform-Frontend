@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { AlertTriangle, BedDouble, CheckCircle2, Info, MapPin, Pencil, Plus, Send } from "lucide-react";
+import { AlertTriangle, BedDouble, CheckCircle2, MapPin, Pencil, Plus, Send } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Loader } from "@/components/ui/Loader";
@@ -12,16 +12,13 @@ import { listingStateLabel, listingStateTone } from "@/lib/status";
 import { formatCurrency } from "@/lib/utils";
 import {
   HostedListingInput,
-  cacheHostedListing,
   createHostedListing,
   errorMessage,
   getHostedListingPublishEligibility,
+  listHostedListings,
   listHostedProperties,
   listHostedRooms,
-  listPublicListings,
   publishHostedListing,
-  readCachedHostedListings,
-  toHostedListing,
   updateHostedListing,
 } from "@/lib/user-api";
 import { IdentityGate } from "@/components/user/IdentityGate";
@@ -121,25 +118,13 @@ export function HostingListingsManager() {
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      const owned = await listHostedProperties();
+      const [owned, mine] = await Promise.all([listHostedProperties(), listHostedListings()]);
       setProperties(owned);
       const roomLists = await Promise.all(
         owned.map((property) => listHostedRooms(property.id).catch(() => [] as Room[]))
       );
       setRoomsByProperty(Object.fromEntries(owned.map((property, i) => [property.id, roomLists[i]])));
-
-      // No "list my listings" endpoint exists, so recover published ones from the
-      // public catalogue and merge them over the locally cached write results.
-      const published = await listPublicListings().catch(() => []);
-      const mine = published
-        .filter((listing) => listing.ownerEmail.toLowerCase() === user.email.toLowerCase())
-        .map(toHostedListing);
-
-      const cached = readCachedHostedListings(user.id);
-      const merged = new Map<string, HostedListing>();
-      cached.forEach((listing) => merged.set(listing.id, listing));
-      mine.forEach((listing) => merged.set(listing.id, { ...merged.get(listing.id), ...listing }));
-      setListings([...merged.values()]);
+      setListings(mine);
     } catch (err) {
       showToast(errorMessage(err, "Could not load your listings."), "error");
     } finally {
@@ -223,7 +208,6 @@ export function HostingListingsManager() {
     try {
       const saved =
         form.id === null ? await createHostedListing(payload) : await updateHostedListing(form.id, payload);
-      cacheHostedListing(user.id, saved);
       setListings((prev) => [saved, ...prev.filter((l) => l.id !== saved.id)]);
       setForm(null);
       showToast(form.id === null ? "Draft listing created." : "Listing updated.");
@@ -255,7 +239,6 @@ export function HostingListingsManager() {
     setBusyListingId(listingId);
     try {
       const published = await publishHostedListing(listingId);
-      cacheHostedListing(user.id, published);
       setListings((prev) => prev.map((l) => (l.id === published.id ? published : l)));
       showToast("Listing published — it is now visible to renters.");
     } catch (err) {
@@ -286,7 +269,7 @@ export function HostingListingsManager() {
           subtitle="Create a draft from one of your rooms, then publish it once every compliance check passes."
         />
         <Button size="sm" onClick={openCreate} disabled={roomOptions.length === 0}>
-          <Plus className="h-4 w-4" /> New listing
+          <Plus className="h-4 w-4" /> Create Listing
         </Button>
       </div>
 
@@ -307,16 +290,6 @@ export function HostingListingsManager() {
           </div>
         </Card>
       )}
-
-      <Card className="!bg-slate-50 !ring-slate-200 dark:!bg-slate-800/60 dark:!ring-white/10">
-        <div className="flex items-start gap-3">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Published listings are always read back from the live catalogue. Drafts are remembered on this device
-            only — the backend does not yet expose an endpoint that lists a host&apos;s draft listings.
-          </p>
-        </div>
-      </Card>
 
       {listings.length === 0 ? (
         <Card>
@@ -365,7 +338,7 @@ export function HostingListingsManager() {
                       loading={busy}
                       onClick={() => checkEligibility(listing.id)}
                     >
-                      Check eligibility
+                      Validate
                     </Button>
                     {listing.state !== "PUBLISHED" && (
                       <Button
