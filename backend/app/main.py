@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import (
     admin_notifications,
+    admin_contact,
     admin_users,
     analytics,
     authority,
@@ -30,6 +31,7 @@ from app.api.routes import (
     uploads,
     user_auth,
     user_chat,
+    user_contact,
     user_hosting,
     user_identity,
     user_notifications,
@@ -100,6 +102,8 @@ app.include_router(chatbot.router)
 app.include_router(user_chat.router)
 app.include_router(user_notifications.router)
 app.include_router(admin_notifications.router)
+app.include_router(user_contact.router)
+app.include_router(admin_contact.router)
 
 
 @app.get("/health")
