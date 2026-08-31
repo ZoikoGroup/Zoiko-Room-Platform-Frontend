@@ -7,10 +7,26 @@ from app.crud.ids import new_id, slugify
 from app.crud.identity_verification import get_verified_identity_for_party
 from app.crud.occupancy_classification import get_classification_for_room
 from app.models.admin_user import AdminUser
-from app.models.listing import Listing
+from app.models.listing import Listing, MAX_LISTING_IMAGES, SUPPORTED_CURRENCIES
 from app.models.market_release import MarketRelease
 from app.models.room import Room
 from app.schemas.listing import ListingCreate, ListingUpdate, PublicListingRead
+
+
+def _validate_currency(currency: str) -> None:
+    if currency not in SUPPORTED_CURRENCIES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Unsupported currency '{currency}'. Supported currencies: {', '.join(SUPPORTED_CURRENCIES)}",
+        )
+
+
+def _validate_image_count(images: list[str]) -> None:
+    if len(images) > MAX_LISTING_IMAGES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"A listing can have at most {MAX_LISTING_IMAGES} images ({len(images)} given)",
+        )
 
 
 def _resolve_market_release_id_for_room(db: Session, room_id: int | None) -> int | None:
@@ -93,6 +109,7 @@ def to_public_listing_read(listing: Listing) -> PublicListingRead:
         latitude=listing.latitude,
         longitude=listing.longitude,
         price_per_night=listing.price_per_night,
+        currency=listing.currency,
         rating=listing.rating,
         review_count=listing.review_count,
         guests=listing.guests,
@@ -113,6 +130,8 @@ def to_public_listing_read(listing: Listing) -> PublicListingRead:
 def create_listing(db: Session, data: ListingCreate, owner: AdminUser) -> Listing:
     if data.min_stay_nights < 30:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Minimum stay must be at least 30 nights")
+    _validate_currency(data.currency)
+    _validate_image_count(data.images)
 
     listing = Listing(
         id=new_id("L"),
@@ -136,6 +155,8 @@ def create_listing_for_party(db: Session, data: ListingCreate, party_id: int) ->
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Minimum stay must be at least 30 nights")
     if data.room_id is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "A hosted listing must be linked to one of your rooms")
+    _validate_currency(data.currency)
+    _validate_image_count(data.images)
 
     assert_party_owns_room(db, data.room_id, party_id)
     listing = Listing(
@@ -164,6 +185,10 @@ def assert_party_owns_room(db: Session, room_id: int, party_id: int) -> None:
 def update_listing(db: Session, listing: Listing, data: ListingUpdate) -> Listing:
     if data.min_stay_nights is not None and data.min_stay_nights < 30:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Minimum stay must be at least 30 nights")
+    if data.currency is not None:
+        _validate_currency(data.currency)
+    if data.images is not None:
+        _validate_image_count(data.images)
 
     updates = data.model_dump(exclude_unset=True)
     for field, value in updates.items():
@@ -192,6 +217,7 @@ def duplicate_listing(db: Session, listing: Listing, owner: AdminUser) -> Listin
         latitude=listing.latitude,
         longitude=listing.longitude,
         price_per_night=listing.price_per_night,
+        currency=listing.currency,
         rating=listing.rating,
         review_count=0,
         guests=listing.guests,

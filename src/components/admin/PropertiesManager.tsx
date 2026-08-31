@@ -29,7 +29,7 @@ import { StarRating } from "@/components/ui/StarRating";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { StatCard } from "@/components/admin/StatCard";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, resolveImageUrl } from "@/lib/utils";
 import { unsplash } from "@/lib/images";
 import { apiClientFetch } from "@/lib/api-client";
 import { getCurrentAdmin } from "@/lib/auth";
@@ -378,7 +378,7 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
           >
             <div className="relative h-40 w-full">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={listing.images[0]} alt={listing.name} className="h-full w-full object-cover" />
+              <img src={resolveImageUrl(listing.images[0])} alt={listing.name} className="h-full w-full object-cover" />
               <Badge tone="primary" className="absolute left-3 top-3">
                 {listing.minStayNights}+ nights
               </Badge>
@@ -436,7 +436,7 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
               <div className="mt-2 flex items-center justify-between">
                 <StarRating rating={listing.rating} size={12} />
                 <span className="text-sm font-bold text-primary-800 dark:text-primary-200">
-                  {formatCurrency(listing.pricePerNight)}
+                  {formatCurrency(listing.pricePerNight, listing.currency)}
                   <span className="text-xs font-medium text-slate-400 dark:text-slate-400">/night</span>
                 </span>
               </div>

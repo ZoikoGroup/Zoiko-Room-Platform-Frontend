@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.correlation import get_correlation_id
+from app.core.image_uploads import save_listing_images
 from app.crud.audit import log_audit_event
 from app.crud.events import emit_event
 from app.crud import listing as listing_crud
@@ -16,6 +17,20 @@ from app.schemas.marketplace import PropertyCreate, PropertyRead, RoomCreate, Ro
 from app.schemas.listing import ListingCreate, ListingRead, ListingUpdate
 
 router = APIRouter(prefix="/api/users/hosting", tags=["user-hosting"])
+
+
+@router.post("/uploads/images")
+async def upload_user_listing_images(
+    files: list[UploadFile],
+    user: UserAccount = Depends(get_current_user),
+):
+    """Lets a host upload photos for their own listings. USER-authenticated
+    (get_current_user) -- deliberately never get_current_admin, and shares
+    validation/storage with the admin upload endpoint via save_listing_images
+    rather than duplicating it. Stores into the same PUBLIC upload_dir as the
+    admin path; identity documents never pass through here."""
+    urls = await save_listing_images(files)
+    return {"urls": urls}
 
 
 def _get_property_or_404(db: Session, property_id: int, user: UserAccount):

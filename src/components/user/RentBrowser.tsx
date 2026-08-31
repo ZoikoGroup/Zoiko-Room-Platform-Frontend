@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Loader } from "@/components/ui/Loader";
 import { PublicListing } from "@/lib/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, resolveImageUrl } from "@/lib/utils";
 import { errorMessage, listPublicListings, listRentalApplications, submitRentalApplication } from "@/lib/user-api";
 import { IdentityGate } from "@/components/user/IdentityGate";
 import { useUserSession } from "@/components/user/UserSessionContext";
@@ -226,7 +226,7 @@ export function RentBrowser() {
                 >
                   {listing.images[0] ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={listing.images[0]} alt={listing.name} className="h-44 w-full object-cover" />
+                    <img src={resolveImageUrl(listing.images[0])} alt={listing.name} className="h-44 w-full object-cover" />
                   ) : (
                     <div className="flex h-44 w-full items-center justify-center bg-primary-50 dark:bg-primary-500/10">
                       <BedDouble className="h-8 w-8 text-primary-300" />
@@ -266,7 +266,7 @@ export function RentBrowser() {
                     <div className="mt-auto flex items-end justify-between gap-2 pt-4">
                       <div>
                         <p className="font-heading text-lg font-extrabold text-primary-900 dark:text-white">
-                          {formatCurrency(listing.pricePerNight)}
+                          {formatCurrency(listing.pricePerNight, listing.currency)}
                           <span className="text-xs font-medium text-slate-400"> / night</span>
                         </p>
                         <p className="text-xs text-slate-400">Min. {listing.minStayNights} nights</p>
@@ -306,7 +306,7 @@ export function RentBrowser() {
         <form onSubmit={handleApply} className="space-y-4">
           <div className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
             <p>
-              {selected?.location}, {selected?.city} — {selected ? formatCurrency(selected.pricePerNight) : ""} / night,
+              {selected?.location}, {selected?.city} — {selected ? formatCurrency(selected.pricePerNight, selected.currency) : ""} / night,
               minimum {selected?.minStayNights} nights.
             </p>
             <p className="mt-1">Host contact: {selected?.ownerName || "Zoiko host"}</p>

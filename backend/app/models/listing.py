@@ -11,6 +11,17 @@ PROPERTY_TYPES = ("private_room",)
 
 LISTING_STATES = ("DRAFT", "EVIDENCE_PENDING", "REVIEW", "PUBLISHED", "PAUSED", "SUSPENDED", "WITHDRAWN", "ARCHIVED")
 
+# Explicitly stored per listing rather than derived from country/market -- that
+# derivation is future work (see the currency architecture audit). Not an
+# exhaustive ISO 4217 list, just the markets named in that audit; widening this
+# tuple later is additive and safe.
+SUPPORTED_CURRENCIES = ("INR", "GBP", "USD", "EUR", "CAD", "AUD", "AED", "SGD", "NZD")
+
+# No stated limit existed before this; 10 is a reasonable cap on top of the
+# per-file size limit (settings.max_upload_size_mb) so a listing can't grow an
+# unbounded images array.
+MAX_LISTING_IMAGES = 10
+
 
 class Listing(Base):
     __tablename__ = "listings"
@@ -33,6 +44,9 @@ class Listing(Base):
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     price_per_night: Mapped[float] = mapped_column(Float, nullable=False)
+    # Still Float, still just price_per_night's currency -- widening this to Numeric
+    # and deriving it from market/jurisdiction are both separate, later tasks.
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
     rating: Mapped[float] = mapped_column(Float, default=4.5)
     review_count: Mapped[int] = mapped_column(Integer, default=0)
     guests: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import { StarRating } from "@/components/ui/StarRating";
 import { apiFetch, requireSuperAdmin } from "@/lib/api";
 import { Booking, Guest, Listing } from "@/lib/types";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, resolveImageUrl } from "@/lib/utils";
 import { bookingStatusTone } from "@/lib/status";
 
 export default async function AdminDashboardPage() {
@@ -80,12 +80,12 @@ export default async function AdminDashboardPage() {
             {topListings.map((l) => (
               <div key={l.id} className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-primary-50 dark:hover:bg-white/10">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={l.images[0]} alt={l.name} className="h-11 w-11 rounded-lg object-cover" />
+                <img src={resolveImageUrl(l.images[0])} alt={l.name} className="h-11 w-11 rounded-lg object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-primary-900 dark:text-white">{l.name}</p>
                   <StarRating rating={l.rating} size={11} />
                 </div>
-                <span className="text-xs font-bold text-primary-700 dark:text-primary-300">{formatCurrency(l.pricePerNight)}</span>
+                <span className="text-xs font-bold text-primary-700 dark:text-primary-300">{formatCurrency(l.pricePerNight, l.currency)}</span>
               </div>
             ))}
           </div>

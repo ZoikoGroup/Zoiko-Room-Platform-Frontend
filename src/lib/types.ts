@@ -28,6 +28,10 @@ export interface Listing {
   latitude?: number | null;
   longitude?: number | null;
   pricePerNight: number;
+  // ISO-4217-style 3-letter code, e.g. "INR"/"GBP"/"USD". Always present on
+  // current API responses (defaults to "INR" server-side); still worth an "?? INR"
+  // fallback at display sites in case older cached data is ever read.
+  currency: string;
   rating: number;
   reviewCount: number;
   guests: number;
@@ -562,6 +566,7 @@ export interface PublicListing {
   latitude?: number | null;
   longitude?: number | null;
   pricePerNight: number;
+  currency: string;
   rating: number;
   reviewCount: number;
   guests: number;
