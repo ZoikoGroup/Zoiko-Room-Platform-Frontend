@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.crud.authority import get_valid_authority_for_room
@@ -34,14 +34,47 @@ def list_listings_for(db: Session, admin: AdminUser) -> list[Listing]:
     return list(db.scalars(query))
 
 
-def list_public_listings(db: Session) -> list[Listing]:
-    query = (
-        select(Listing)
-        .options(joinedload(Listing.owner))
-        .where(Listing.state == "PUBLISHED")
-        .order_by(Listing.name)
+def list_public_listings(
+    db: Session,
+    *,
+    city: str | None = None,
+    min_price: float | None = None,
+    max_price: float | None = None,
+    room_type: str | None = None,
+    amenities: list[str] | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[list[Listing], int]:
+    """Server-side filtered, paginated public listing search. Only ever returns
+    PUBLISHED listings -- unpublished/withdrawn/draft/etc. states are never
+    reachable through this path regardless of what filters are supplied."""
+    conditions = [Listing.state == "PUBLISHED"]
+    if city:
+        conditions.append(Listing.city.ilike(f"%{city.strip()}%"))
+    if room_type:
+        conditions.append(Listing.room_type.ilike(f"%{room_type.strip()}%"))
+    if min_price is not None:
+        conditions.append(Listing.price_per_night >= min_price)
+    if max_price is not None:
+        conditions.append(Listing.price_per_night <= max_price)
+    if amenities:
+        # Postgres array-containment (@>): the listing's amenities must be a
+        # superset of every amenity requested.
+        conditions.append(Listing.amenities.contains(amenities))
+
+    total = db.scalar(select(func.count()).select_from(Listing).where(*conditions)) or 0
+
+    listings = list(
+        db.scalars(
+            select(Listing)
+            .options(joinedload(Listing.owner))
+            .where(*conditions)
+            .order_by(Listing.name)
+            .limit(limit)
+            .offset(offset)
+        )
     )
-    return list(db.scalars(query))
+    return listings, total
 
 
 def get_listing(db: Session, listing_id: str) -> Listing | None:
@@ -74,8 +107,6 @@ def to_public_listing_read(listing: Listing) -> PublicListingRead:
         room_id=listing.room_id,
         min_stay_nights=listing.min_stay_nights,
         owner_name=listing.contact_name or (listing.owner.full_name if listing.owner else "Host"),
-        owner_email=listing.contact_email or (listing.owner.email if listing.owner else ""),
-        owner_phone=listing.contact_phone or (listing.owner.phone if listing.owner else ""),
     )
 
 

@@ -4,7 +4,7 @@ import {
   IdentityDocumentType,
   IdentityVerificationRecord,
   Property,
-  PublicListing,
+  PublicListingsPage,
   PublishEligibility,
   Room,
   SimulatedPayment,
@@ -72,8 +72,29 @@ export function hasVerifiedIdentity(records: IdentityVerificationRecord[]): bool
 // --- Renting ---------------------------------------------------------------
 
 /** Public catalogue of PUBLISHED listings -- the inventory a user can apply to. */
-export function listPublicListings(): Promise<PublicListing[]> {
-  return apiClientFetch<PublicListing[]>("/api/public/listings");
+export interface PublicListingFilters {
+  city?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  roomType?: string;
+  amenities?: string[];
+  limit?: number;
+  offset?: number;
+}
+
+/** Server-side filtered + paginated search over PUBLISHED listings. Filtering
+ *  happens entirely in the backend query -- never fetch everything and filter
+ *  client-side. */
+export function listPublicListings(filters: PublicListingFilters = {}): Promise<PublicListingsPage> {
+  const params = new URLSearchParams();
+  if (filters.city) params.set("city", filters.city);
+  if (filters.minPrice != null) params.set("min_price", String(filters.minPrice));
+  if (filters.maxPrice != null) params.set("max_price", String(filters.maxPrice));
+  if (filters.roomType) params.set("room_type", filters.roomType);
+  if (filters.amenities?.length) params.set("amenities", filters.amenities.join(","));
+  params.set("limit", String(filters.limit ?? 20));
+  params.set("offset", String(filters.offset ?? 0));
+  return apiClientFetch<PublicListingsPage>(`/api/public/listings?${params.toString()}`);
 }
 
 export function submitRentalApplication(payload: {
@@ -192,6 +213,10 @@ export interface HostedListingInput {
   contactEmail: string;
 }
 
+export function listHostedListings(): Promise<HostedListing[]> {
+  return apiClientFetch<HostedListing[]>("/api/users/hosting/listings");
+}
+
 export function createHostedListing(payload: HostedListingInput): Promise<HostedListing> {
   return apiClientFetch<HostedListing>("/api/users/hosting/listings", {
     method: "POST",
@@ -226,51 +251,3 @@ export function listUserPayments(): Promise<SimulatedPayment[]> {
   return apiClientFetch<SimulatedPayment[]>("/api/users/payments");
 }
 
-// --- Hosted-listing local index --------------------------------------------
-//
-// The backend exposes create / update / publish-eligibility / publish for hosted
-// listings but no "list my listings" endpoint, so there is nothing to read a host's
-// drafts back from. We keep the full ListingRead the API hands back on every write
-// in localStorage (per user id) so drafts survive a reload, and merge the published
-// ones back in from /api/public/listings. Drafts created on another device will not
-// appear until a GET endpoint exists.
-
-const HOSTED_LISTINGS_KEY = "zoiko_user_hosted_listings";
-
-function hostedListingsKey(userId: number): string {
-  return `${HOSTED_LISTINGS_KEY}:${userId}`;
-}
-
-export function readCachedHostedListings(userId: number): HostedListing[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(hostedListingsKey(userId));
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? (parsed as HostedListing[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function cacheHostedListing(userId: number, listing: HostedListing): HostedListing[] {
-  const next = [listing, ...readCachedHostedListings(userId).filter((l) => l.id !== listing.id)];
-  try {
-    window.localStorage.setItem(hostedListingsKey(userId), JSON.stringify(next));
-  } catch {
-    // A full or disabled localStorage must not break the write that just succeeded.
-  }
-  return next;
-}
-
-/** Published listings the user hosts, recovered from the public catalogue by contact email. */
-export function toHostedListing(listing: PublicListing): HostedListing {
-  return {
-    ...listing,
-    ownerId: null,
-    state: "PUBLISHED",
-    marketReleaseId: null,
-    contactName: listing.ownerName,
-    contactPhone: listing.ownerPhone,
-    contactEmail: listing.ownerEmail,
-  };
-}

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -11,9 +11,17 @@ ADMIN_APPROVAL_STATUSES = ("pending", "approved", "rejected")
 
 class AdminUser(Base):
     __tablename__ = "admin_users"
+    # 0001_initial.py created a table-level UNIQUE constraint on email plus a
+    # separately named plain index (not a combined unique index) -- declared
+    # explicitly here, matching the two real objects in the database, so
+    # `alembic check` doesn't report a phantom constraint-vs-index diff.
+    __table_args__ = (
+        UniqueConstraint("email", name="admin_users_email_key"),
+        Index("ix_admin_users_email", "email"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), default="Zoiko Admin")
     phone: Mapped[str] = mapped_column(String(50), default="")

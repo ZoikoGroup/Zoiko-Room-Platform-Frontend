@@ -37,6 +37,17 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     groq_model: str = "openai/gpt-oss-120b"
 
+    # "file" (default) writes emails to dev_mail_outbox/ instead of sending them --
+    # safe for every environment that hasn't explicitly opted in. Set to "smtp" in
+    # production to actually send mail; see app/core/mailer.py.
+    email_provider: str = "file"
+    email_from: str = "Zoiko Rooms <no-reply@zoikorooms.com>"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

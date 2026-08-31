@@ -12,6 +12,7 @@ from app.models.sublet_request import SubletRequest
 from app.models.user_account import UserAccount
 from app.models.guest import Guest
 from app.crud.ids import dicebear_avatar, new_id
+from app.crud import notification as notif_crud
 
 
 def _assert_sublet_permitted(occupancy: Occupancy) -> None:
@@ -88,6 +89,16 @@ def submit_sublet_request(
         authority_evidence_ref=authority_evidence_ref,
     )
     db.add(sublet_request)
+    db.flush()
+
+    notif_crud.notify_all_super_admins(
+        db,
+        title="New sublet request pending review",
+        message=f"{user.full_name} requested to sublet occupancy #{occupancy_id}.",
+        notification_type="sublet_request.submitted",
+        related_entity_type="sublet_request", related_entity_id=str(sublet_request.id),
+    )
+
     db.commit()
     db.refresh(sublet_request)
     return sublet_request
@@ -137,6 +148,19 @@ def verify_sublet_identity(
     return verification is not None
 
 
+def _notify_sublet_requester(db: Session, requester_guest_id: str, *, approved: bool, notes: str) -> None:
+    guest = db.get(Guest, requester_guest_id)
+    if not guest:
+        return
+    verb = "approved" if approved else "rejected"
+    notif_crud.notify_user_by_guest_email(
+        db, guest.email,
+        title=f"Sublet request {verb}",
+        message=notes or f"Your sublet request was {verb}.",
+        notification_type=f"sublet_request.{verb}",
+    )
+
+
 def approve_sublet_request(db: Session, sublet_request: SubletRequest, admin: AdminUser, notes: str = "") -> SubletRequest:
     """Admin approves a sublet request."""
     if admin.role != "super_admin":
@@ -147,6 +171,11 @@ def approve_sublet_request(db: Session, sublet_request: SubletRequest, admin: Ad
     if not verify_sublet_identity(db, sublet_request):
         raise HTTPException(status.HTTP_409_CONFLICT, "Proposed renter no longer has an approved identity verification")
     _assert_sublet_permitted(sublet_request.current_occupancy)
+    # Capture who to notify *before* reassigning the occupancy's guest below --
+    # afterwards current_occupancy.guest_id points at the new tenant, not the
+    # person who submitted this request.
+    requester_guest_id = sublet_request.current_occupancy.guest_id
+
     proposed_guest = _guest_for_proposed_party(db, sublet_request.proposed_renter_party_id)
     sublet_request.current_occupancy.guest_id = proposed_guest.id
     sublet_request.status = "approved"
@@ -154,6 +183,9 @@ def approve_sublet_request(db: Session, sublet_request: SubletRequest, admin: Ad
     sublet_request.admin_notes = notes
     sublet_request.decided_by_admin_id = admin.id
     sublet_request.decided_at = datetime.now(timezone.utc)
+
+    _notify_sublet_requester(db, requester_guest_id, approved=True, notes=notes)
+
     db.commit()
     db.refresh(sublet_request)
     return sublet_request
@@ -171,6 +203,9 @@ def reject_sublet_request(db: Session, sublet_request: SubletRequest, admin: Adm
     sublet_request.admin_notes = notes
     sublet_request.decided_by_admin_id = admin.id
     sublet_request.decided_at = datetime.now(timezone.utc)
+
+    _notify_sublet_requester(db, sublet_request.current_occupancy.guest_id, approved=False, notes=notes)
+
     db.commit()
     db.refresh(sublet_request)
     return sublet_request

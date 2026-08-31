@@ -31,6 +31,7 @@ from app.models.room_passport import RoomPassportClaim, RoomPassportSnapshot
 from app.models.identity_verification import IdentityVerification
 from app.models.password_reset_token import PasswordResetToken
 from app.models.chat import ChatConversation, ChatMessage
+from app.models.notification import Notification
 from app.models.contact_email import ContactEmail
 
 __all__ = [
@@ -72,5 +73,6 @@ __all__ = [
     "PasswordResetToken",
     "ChatConversation",
     "ChatMessage",
+    "Notification",
     "ContactEmail",
 ]

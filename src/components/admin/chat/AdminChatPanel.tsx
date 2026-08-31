@@ -67,7 +67,7 @@ function TypingDots() {
   );
 }
 
-export function AdminChatPanel({ open, onClose, onUnread }: AdminChatPanelProps) {
+export function AdminChatPanel({ open, onClose }: AdminChatPanelProps) {
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [activeTitle, setActiveTitle] = useState<string>("");
