@@ -15,6 +15,7 @@ export const listingStateTone = {
   DRAFT: "neutral",
   EVIDENCE_PENDING: "warning",
   REVIEW: "primary",
+  REJECTED: "danger",
   PUBLISHED: "success",
   PAUSED: "warning",
   SUSPENDED: "danger",
@@ -25,7 +26,8 @@ export const listingStateTone = {
 export const listingStateLabel = {
   DRAFT: "Draft",
   EVIDENCE_PENDING: "Evidence Pending",
-  REVIEW: "In Review",
+  REVIEW: "Pending Review",
+  REJECTED: "Rejected",
   PUBLISHED: "Published",
   PAUSED: "Paused",
   SUSPENDED: "Suspended",

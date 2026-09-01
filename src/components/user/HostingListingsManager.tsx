@@ -2,23 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { AlertTriangle, BedDouble, CheckCircle2, MapPin, Pencil, Plus, Send } from "lucide-react";
+import { AlertTriangle, BedDouble, MapPin, Pencil, Plus, Send, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Loader } from "@/components/ui/Loader";
 import { Modal } from "@/components/ui/Modal";
-import { HostedListing, Property, PublishEligibility, Room } from "@/lib/types";
+import { HostedListing, Property, Room } from "@/lib/types";
 import { listingStateLabel, listingStateTone } from "@/lib/status";
 import { formatCurrency } from "@/lib/utils";
 import {
   HostedListingInput,
   createHostedListing,
   errorMessage,
-  getHostedListingPublishEligibility,
   listHostedListings,
   listHostedProperties,
   listHostedRooms,
-  publishHostedListing,
+  submitHostedListingForReview,
   updateHostedListing,
 } from "@/lib/user-api";
 import { IdentityGate } from "@/components/user/IdentityGate";
@@ -110,7 +109,7 @@ function splitList(value: string): string[] {
 }
 
 export function HostingListingsManager() {
-  const { user, identityVerified } = useUserSession();
+  const { user } = useUserSession();
   const { toast, showToast } = useToast();
 
   const [listings, setListings] = useState<HostedListing[]>([]);
@@ -122,7 +121,6 @@ export function HostingListingsManager() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const [eligibility, setEligibility] = useState<Record<string, PublishEligibility>>({});
   const [busyListingId, setBusyListingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -229,34 +227,15 @@ export function HostingListingsManager() {
     }
   }
 
-  async function checkEligibility(listingId: string) {
-    setBusyListingId(listingId);
-    try {
-      const result = await getHostedListingPublishEligibility(listingId);
-      setEligibility((prev) => ({ ...prev, [listingId]: result }));
-      showToast(
-        result.eligible ? "This listing is ready to publish." : "This listing is not eligible to publish yet.",
-        result.eligible ? "success" : "error"
-      );
-    } catch (err) {
-      showToast(errorMessage(err, "Could not check publish eligibility."), "error");
-    } finally {
-      setBusyListingId(null);
-    }
-  }
-
-  async function publish(listingId: string) {
+  async function submitForReview(listingId: string) {
     if (!user) return;
     setBusyListingId(listingId);
     try {
-      const published = await publishHostedListing(listingId);
-      setListings((prev) => prev.map((l) => (l.id === published.id ? published : l)));
-      showToast("Listing published — it is now visible to renters.");
+      const submitted = await submitHostedListingForReview(listingId);
+      setListings((prev) => prev.map((l) => (l.id === submitted.id ? submitted : l)));
+      showToast("Submitted for review — a Zoiko admin will approve or reject it.");
     } catch (err) {
-      // The backend returns the blocking reasons on a 409; re-read them from the
-      // eligibility endpoint so the host sees exactly what to fix.
-      await checkEligibility(listingId).catch(() => undefined);
-      showToast(errorMessage(err, "Could not publish this listing."), "error");
+      showToast(errorMessage(err, "Could not submit this listing for review."), "error");
     } finally {
       setBusyListingId(null);
     }
@@ -266,10 +245,10 @@ export function HostingListingsManager() {
 
   return (
     <div className="space-y-5">
-      <IdentityGate action="publish a listing">
+      <IdentityGate action="submit a listing for review">
         <Card className="!bg-emerald-50 !ring-emerald-200 dark:!bg-emerald-500/10 dark:!ring-emerald-500/20">
           <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-            Your identity is verified — one of the checks required before a listing can go live.
+            Your identity is verified.
           </p>
         </Card>
       </IdentityGate>
@@ -277,7 +256,7 @@ export function HostingListingsManager() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SectionHeading
           title="Your listings"
-          subtitle="Create a draft from one of your rooms, then publish it once every compliance check passes."
+          subtitle="Create a draft from one of your rooms, then submit it for a Zoiko admin to review and publish."
         />
         <Button size="sm" onClick={openCreate} disabled={roomOptions.length === 0}>
           <Plus className="h-4 w-4" /> Create Listing
@@ -314,7 +293,6 @@ export function HostingListingsManager() {
       ) : (
         <div className="space-y-3">
           {listings.map((listing) => {
-            const check = eligibility[listing.id];
             const busy = busyListingId === listing.id;
             return (
               <Card key={listing.id}>
@@ -343,55 +321,29 @@ export function HostingListingsManager() {
                     <Button size="sm" variant="ghost" onClick={() => openEdit(listing)}>
                       <Pencil className="h-3.5 w-3.5" /> Edit
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      loading={busy}
-                      onClick={() => checkEligibility(listing.id)}
-                    >
-                      Validate
-                    </Button>
-                    {listing.state !== "PUBLISHED" && (
-                      <Button
-                        size="sm"
-                        loading={busy}
-                        disabled={!identityVerified || check?.eligible === false}
-                        onClick={() => publish(listing.id)}
-                      >
-                        <Send className="h-3.5 w-3.5" /> Publish
+                    {(listing.state === "DRAFT" || listing.state === "REJECTED") && (
+                      <Button size="sm" loading={busy} onClick={() => submitForReview(listing.id)}>
+                        <Send className="h-3.5 w-3.5" /> Submit for Review
                       </Button>
                     )}
                   </div>
                 </div>
 
-                {check && (
-                  <div
-                    className={`mt-4 rounded-xl px-4 py-3 text-xs ring-1 ${
-                      check.eligible
-                        ? "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20"
-                        : "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20"
-                    }`}
-                  >
-                    {check.eligible ? (
-                      <p className="flex items-center gap-1.5 font-semibold">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Every publish check passes.
-                      </p>
-                    ) : (
-                      <>
-                        <p className="flex items-center gap-1.5 font-semibold">
-                          <AlertTriangle className="h-3.5 w-3.5" /> Blocking checks:
-                        </p>
-                        <ul className="mt-1.5 list-disc space-y-0.5 pl-5">
-                          {check.reasons.map((reason) => (
-                            <li key={reason}>{reason}</li>
-                          ))}
-                        </ul>
-                        <p className="mt-2">
-                          Room authority records, occupancy classification and market releases are set by a Zoiko
-                          admin — contact support once your own details are correct.
-                        </p>
-                      </>
-                    )}
+                {listing.state === "REVIEW" && (
+                  <div className="mt-4 rounded-xl bg-primary-50 px-4 py-3 text-xs text-primary-700 ring-1 ring-primary-200 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-500/20">
+                    <p className="flex items-center gap-1.5 font-semibold">
+                      <AlertTriangle className="h-3.5 w-3.5" /> Awaiting review by a Zoiko admin.
+                    </p>
+                  </div>
+                )}
+
+                {listing.state === "REJECTED" && (
+                  <div className="mt-4 rounded-xl bg-accent-50 px-4 py-3 text-xs text-accent-700 ring-1 ring-accent-200 dark:bg-accent-500/10 dark:text-accent-300 dark:ring-accent-500/20">
+                    <p className="flex items-center gap-1.5 font-semibold">
+                      <XCircle className="h-3.5 w-3.5" /> Not approved
+                    </p>
+                    {listing.rejectionReason && <p className="mt-1">Reason: {listing.rejectionReason}</p>}
+                    <p className="mt-1">Make the necessary changes and submit it for review again.</p>
                   </div>
                 )}
               </Card>

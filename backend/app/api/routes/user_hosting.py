@@ -9,7 +9,6 @@ from app.core.image_uploads import save_listing_images
 from app.crud.audit import log_audit_event
 from app.crud.events import emit_event
 from app.crud import listing as listing_crud
-from app.crud import notification as notification_crud
 from app.crud.property import get_property, list_rooms_for_property
 from app.db.session import get_db
 from app.models.user_account import UserAccount
@@ -253,30 +252,21 @@ def get_user_listing_publish_eligibility(
     return {"eligible": not reasons, "reasons": reasons}
 
 
-@router.post("/listings/{listing_id}/publish", response_model=ListingRead)
-def publish_user_listing(
+@router.post("/listings/{listing_id}/submit-for-review", response_model=ListingRead)
+def submit_user_listing_for_review(
     listing_id: str,
     request: Request,
     user: UserAccount = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """A host can only ask for review -- publishing is always an explicit
+    admin/super-admin decision (see listings.py's publish/reject endpoints)."""
     listing = _get_user_listing_or_404(db, listing_id, user)
-    updated = listing_crud.publish_listing(db, listing)
-    log_audit_event(db, None, "user_listing.publish", "listing", listing_id, get_correlation_id(request), reason=f"user:{user.id}")
-    emit_event(db, "listing.published", "listing", listing_id, {"room_id": updated.room_id, "partyId": user.party_id})
-    notification_crud.notify_user(
-        db, user.id,
-        title="Listing published",
-        message=f'"{updated.name}" is now live on the marketplace.',
-        notification_type="listing.published",
-        related_entity_type="listing", related_entity_id=listing_id,
+    updated = listing_crud.submit_listing_for_review(db, listing)
+    log_audit_event(
+        db, None, "user_listing.submit_for_review", "listing", listing_id, get_correlation_id(request),
+        reason=f"user:{user.id}",
     )
-    notification_crud.notify_all_super_admins(
-        db,
-        title="New listing published",
-        message=f'{user.full_name} published "{updated.name}".',
-        notification_type="listing.published",
-        related_entity_type="listing", related_entity_id=listing_id,
-    )
+    emit_event(db, "listing.submitted", "listing", listing_id, {"room_id": updated.room_id, "partyId": user.party_id})
     db.commit()
     return updated

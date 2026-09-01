@@ -36,7 +36,7 @@ GENERIC_FORGOT_PASSWORD_MESSAGE = "If an account exists for that email, a passwo
 
 
 def _set_user_cookie(response: Response, email: str) -> None:
-    token = create_access_token(subject=email)
+    token = create_access_token(subject=email, token_type="user")
     response.set_cookie(
         key=USER_COOKIE_NAME,
         value=token,

@@ -2,10 +2,13 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.mailer import send_listing_published_email, send_listing_rejected_email
+from app.crud import notification as notification_crud
 from app.crud.authority import get_valid_authority_for_room
 from app.crud.ids import new_id, slugify
 from app.crud.identity_verification import get_verified_identity_for_party
 from app.crud.occupancy_classification import get_classification_for_room
+from app.crud.user import get_user_by_party_id
 from app.models.admin_user import AdminUser
 from app.models.listing import Listing, MAX_LISTING_IMAGES, SUPPORTED_CURRENCIES
 from app.models.market_release import MarketRelease
@@ -44,10 +47,13 @@ def _resolve_market_release_id_for_room(db: Session, room_id: int | None) -> int
 
 
 def list_listings_for(db: Session, admin: AdminUser) -> list[Listing]:
-    query = select(Listing).order_by(Listing.name)
-    if admin.role != "super_admin":
-        query = query.where(Listing.owner_id == admin.id)
-    return list(db.scalars(query))
+    """Every admin (not just super_admin) sees every listing, including USER-hosted
+    ones -- ADMIN's job includes reviewing listings submitted by any host, so
+    visibility here is operational, not per-admin-owner scoped. Mutating someone
+    else's listing content is still owner-or-super-admin gated separately
+    (see _assert_owner_or_super_admin in api/routes/listings.py); this only
+    affects what an admin can see and review/approve/reject."""
+    return list(db.scalars(select(Listing).order_by(Listing.name)))
 
 
 def list_public_listings(
@@ -252,9 +258,11 @@ def set_listing_state(db: Session, listing: Listing, state: str) -> Listing:
 
 
 def check_publish_eligibility(db: Session, listing: Listing) -> list[str]:
-    """Fail-closed eligibility gate. Returns a list of blocking reasons -- empty means
-    the listing may publish. Every check runs regardless of who owns the listing;
-    identity/role is never treated as proof of authority."""
+    """Informational compliance signals for the admin review screen -- NOT a hard
+    publish gate (see publish_listing). Returns a list of human-readable warnings;
+    empty means every signal looks good. The one exception is "not linked to a
+    room", which is a genuine structural requirement (there is nothing to publish)
+    and is still enforced separately in publish_listing/submit_listing_for_review."""
     reasons: list[str] = []
 
     if listing.room_id is None:
@@ -286,8 +294,81 @@ def check_publish_eligibility(db: Session, listing: Listing) -> list[str]:
     return reasons
 
 
+def submit_listing_for_review(db: Session, listing: Listing) -> Listing:
+    """USER-facing: DRAFT or REJECTED -> REVIEW. Publishing itself is always an
+    explicit admin/super-admin decision from here on -- a USER can only ask for
+    review, never publish directly."""
+    if listing.room_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Listing must be linked to a room before it can be submitted")
+    if listing.state not in ("DRAFT", "REJECTED"):
+        raise HTTPException(status.HTTP_409_CONFLICT, f"A listing in state {listing.state} cannot be submitted for review")
+
+    listing.rejection_reason = ""
+    listing.state = "REVIEW"
+    db.commit()
+    db.refresh(listing)
+
+    notification_crud.notify_all_admins(
+        db,
+        title="Listing pending review",
+        message=f'"{listing.name}" was submitted and needs review.',
+        notification_type="listing.submitted",
+        related_entity_type="listing", related_entity_id=listing.id,
+    )
+    db.commit()
+    return listing
+
+
 def publish_listing(db: Session, listing: Listing) -> Listing:
-    reasons = check_publish_eligibility(db, listing)
-    if reasons:
-        raise HTTPException(status.HTTP_409_CONFLICT, {"message": "Listing is not eligible to publish", "reasons": reasons})
-    return set_listing_state(db, listing, "PUBLISHED")
+    """Admin/super-admin only (enforced at the route level). check_publish_eligibility
+    is informational -- it is deliberately NOT consulted here; the admin's decision
+    to approve is the final authority, not an automated compliance gate."""
+    if listing.room_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Listing must be linked to a room before it can be published")
+    if listing.state == "PUBLISHED":
+        return listing
+
+    listing.rejection_reason = ""
+    listing.state = "PUBLISHED"
+    db.commit()
+    db.refresh(listing)
+
+    user = get_user_by_party_id(db, listing.party_id)
+    if user:
+        notification_crud.notify_user(
+            db, user.id,
+            title="Listing approved and published",
+            message=f'Your listing "{listing.name}" has been approved and published.',
+            notification_type="listing.published",
+            related_entity_type="listing", related_entity_id=listing.id,
+        )
+        db.commit()
+        send_listing_published_email(user.email, user.full_name, listing.name)
+    return listing
+
+
+def reject_listing(db: Session, listing: Listing, reason: str) -> Listing:
+    """Admin/super-admin only (enforced at the route level). Only a listing that
+    was actually submitted for review can be rejected."""
+    if listing.state != "REVIEW":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Only a listing pending review can be rejected")
+    if not reason.strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "A rejection reason is required")
+
+    listing.state = "REJECTED"
+    listing.rejection_reason = reason.strip()
+    db.commit()
+    db.refresh(listing)
+
+    user = get_user_by_party_id(db, listing.party_id)
+    if user:
+        notification_crud.notify_user(
+            db, user.id,
+            title="Listing not approved",
+            message=f'Your listing "{listing.name}" was not approved. Reason: {listing.rejection_reason}',
+            notification_type="listing.rejected",
+            related_entity_type="listing", related_entity_id=listing.id,
+        )
+        db.commit()
+        send_listing_rejected_email(user.email, user.full_name, listing.name, listing.rejection_reason)
+    return listing

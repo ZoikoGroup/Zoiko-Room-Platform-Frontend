@@ -151,10 +151,10 @@ def _make_user(db: Session, *, email: str = "user@test.com") -> UserAccount:
 
 
 def auth_admin_cookie(admin: AdminUser) -> dict[str, str]:
-    token = create_access_token(admin.email)
+    token = create_access_token(admin.email, token_type="admin")
     return {ADMIN_COOKIE: token}
 
 
 def auth_user_cookie(user: UserAccount) -> dict[str, str]:
-    token = create_access_token(user.email)
+    token = create_access_token(user.email, token_type="user")
     return {USER_COOKIE: token}

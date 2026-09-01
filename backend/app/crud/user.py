@@ -16,6 +16,15 @@ def get_user_by_id(db: Session, user_id: int) -> UserAccount | None:
     return db.get(UserAccount, user_id)
 
 
+def get_user_by_party_id(db: Session, party_id: int | None) -> UserAccount | None:
+    """None for a Party that has no linked UserAccount at all -- e.g. the internal
+    operator party an admin gets auto-provisioned when they create a property
+    directly, which nobody registers a personal account for."""
+    if party_id is None:
+        return None
+    return db.scalar(select(UserAccount).where(UserAccount.party_id == party_id))
+
+
 def authenticate_user(db: Session, email: str, password: str) -> UserAccount | None:
     user = get_user_by_email(db, email)
     if not user or not verify_password(password, user.hashed_password):

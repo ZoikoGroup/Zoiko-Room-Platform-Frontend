@@ -9,7 +9,9 @@ from app.db.base import Base
 # still read it; new listings are constrained to "private_room" at the API layer.
 PROPERTY_TYPES = ("private_room",)
 
-LISTING_STATES = ("DRAFT", "EVIDENCE_PENDING", "REVIEW", "PUBLISHED", "PAUSED", "SUSPENDED", "WITHDRAWN", "ARCHIVED")
+LISTING_STATES = (
+    "DRAFT", "EVIDENCE_PENDING", "REVIEW", "REJECTED", "PUBLISHED", "PAUSED", "SUSPENDED", "WITHDRAWN", "ARCHIVED"
+)
 
 # Explicitly stored per listing rather than derived from country/market -- that
 # derivation is future work (see the currency architecture audit). Not an
@@ -69,6 +71,9 @@ class Listing(Base):
     market_release_id: Mapped[int | None] = mapped_column(ForeignKey("market_releases.id"), nullable=True)
     min_stay_nights: Mapped[int] = mapped_column(Integer, default=30)
     state: Mapped[str] = mapped_column(String(20), default="DRAFT")
+    # Set by an admin/super admin when moving REVIEW -> REJECTED; cleared again on
+    # resubmission. Empty for every other state.
+    rejection_reason: Mapped[str] = mapped_column(String(1000), default="")
 
     # Optional per-listing override of the owner account's contact details --
     # left blank, the public API falls back to the owner's name/email/phone.
