@@ -6,6 +6,7 @@ export type ListingState =
   | "DRAFT"
   | "EVIDENCE_PENDING"
   | "REVIEW"
+  | "REJECTED"
   | "PUBLISHED"
   | "PAUSED"
   | "SUSPENDED"
@@ -44,10 +45,12 @@ export interface Listing {
   tags: string[];
   featured?: boolean;
   ownerId: number;
+  partyId: number | null;
   roomId: number | null;
   minStayNights: number;
   marketReleaseId: number | null;
   state: ListingState;
+  rejectionReason: string;
   contactName: string;
   contactPhone: string;
   contactEmail: string;

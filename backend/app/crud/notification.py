@@ -107,6 +107,21 @@ def notify_all_super_admins(db: Session, **kwargs) -> list[Notification]:
     return created
 
 
+def notify_all_admins(db: Session, **kwargs) -> list[Notification]:
+    """Same fan-out as notify_all_super_admins, but every active admin regardless
+    of role -- for operational events (e.g. a listing submitted for review) that
+    any admin, not just super admins, should see and can act on."""
+    admin_ids = db.scalars(
+        select(AdminUser.id).where(AdminUser.is_active.is_(True), AdminUser.approval_status == "approved")
+    )
+    created = []
+    for admin_id in admin_ids:
+        row = notify_admin(db, admin_id, **kwargs)
+        if row:
+            created.append(row)
+    return created
+
+
 def list_for_user(db: Session, user_id: int, limit: int = 50) -> list[Notification]:
     return list(
         db.scalars(

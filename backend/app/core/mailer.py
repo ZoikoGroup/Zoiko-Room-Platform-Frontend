@@ -163,3 +163,34 @@ def send_identity_verification_rejected_email(to_email: str, full_name: str, not
         cta_label="Submit a new document",
         cta_url=f"{settings.frontend_url}/account/identity",
     )
+
+
+def send_listing_published_email(to_email: str, full_name: str, listing_name: str) -> None:
+    send_email(
+        to_email,
+        f"Your listing '{listing_name}' has been approved and published",
+        heading="Your listing is live!",
+        body_lines=[
+            f"Hi {full_name},",
+            f"Your listing \"{listing_name}\" has been reviewed, approved and is now published on the marketplace.",
+        ],
+        cta_label="View your listings",
+        cta_url=f"{settings.frontend_url}/account/host/listings",
+    )
+
+
+def send_listing_rejected_email(to_email: str, full_name: str, listing_name: str, reason: str = "") -> None:
+    body_lines = [
+        f"Hi {full_name},",
+        f"Your listing \"{listing_name}\" was not approved.",
+    ]
+    if reason:
+        body_lines.append(f"Reason: {reason}")
+    send_email(
+        to_email,
+        f"Your listing '{listing_name}' was not approved",
+        heading="Listing not approved",
+        body_lines=body_lines,
+        cta_label="Review your listings",
+        cta_url=f"{settings.frontend_url}/account/host/listings",
+    )

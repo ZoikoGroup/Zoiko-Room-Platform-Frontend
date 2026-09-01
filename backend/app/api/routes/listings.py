@@ -8,7 +8,7 @@ from app.crud.audit import log_audit_event
 from app.crud.events import emit_event
 from app.db.session import get_db
 from app.models.admin_user import AdminUser
-from app.schemas.listing import ListingCreate, ListingRead, ListingUpdate
+from app.schemas.listing import ListingCreate, ListingRead, ListingRejectRequest, ListingUpdate
 
 router = APIRouter(prefix="/api/listings", tags=["listings"], dependencies=[Depends(get_current_admin)])
 
@@ -75,11 +75,29 @@ def publish_listing(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    """Approve & publish. Any admin/super admin may do this for any listing --
+    review is an operational task, not scoped to "listings I personally own"."""
     listing = _get_or_404(db, listing_id)
-    _assert_owner_or_super_admin(listing, admin)
     updated = crud.publish_listing(db, listing)
     log_audit_event(db, admin, "listing.publish", "listing", listing_id, get_correlation_id(request))
     emit_event(db, "listing.published", "listing", listing_id, {"room_id": listing.room_id})
+    db.commit()
+    return updated
+
+
+@router.post("/{listing_id}/reject", response_model=ListingRead)
+def reject_listing(
+    listing_id: str,
+    payload: ListingRejectRequest,
+    request: Request,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """Reject a listing pending review, with a required reason. Any admin/super
+    admin may do this, same as publish."""
+    listing = _get_or_404(db, listing_id)
+    updated = crud.reject_listing(db, listing, payload.reason)
+    log_audit_event(db, admin, "listing.reject", "listing", listing_id, get_correlation_id(request), reason=payload.reason)
     db.commit()
     return updated
 

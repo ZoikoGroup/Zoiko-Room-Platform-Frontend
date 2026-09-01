@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import {
+  AlertTriangle,
   Ban,
   Building2,
   CheckCircle2,
   Contact,
   Copy,
+  Eye,
   Globe,
   Mail,
   MapPin,
@@ -22,6 +24,7 @@ import {
   SlidersHorizontal,
   Trash2,
   Users,
+  XCircle,
 } from "lucide-react";
 import { AdminRole, Listing, ListingState, Property, PublishEligibility, Room } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
@@ -81,6 +84,10 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
   const [roomOptions, setRoomOptions] = useState<RoomOption[]>([]);
   const [addingRoom, setAddingRoom] = useState(false);
   const [newRoom, setNewRoom] = useState(emptyNewRoom);
+  const [reviewListing, setReviewListing] = useState<Listing | null>(null);
+  const [reviewSignals, setReviewSignals] = useState<PublishEligibility | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [reviewBusy, setReviewBusy] = useState(false);
 
   useEffect(() => {
     getCurrentAdmin().then((admin) => setRole(admin?.role ?? null));
@@ -177,6 +184,57 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
       );
     } catch {
       showToast(`Failed to ${action} listing`);
+    }
+  }
+
+  async function openReview(listing: Listing) {
+    setReviewListing(listing);
+    setRejectReason("");
+    setReviewSignals(null);
+    try {
+      const signals = await apiClientFetch<PublishEligibility>(`/api/listings/${listing.id}/publish-eligibility`);
+      setReviewSignals(signals);
+    } catch {
+      // Informational only -- the review modal still works without these signals.
+    }
+  }
+
+  function closeReview() {
+    setReviewListing(null);
+    setReviewSignals(null);
+    setRejectReason("");
+  }
+
+  async function approveAndPublish() {
+    if (!reviewListing) return;
+    setReviewBusy(true);
+    try {
+      const updated = await apiClientFetch<Listing>(`/api/listings/${reviewListing.id}/publish`, { method: "POST" });
+      setItems((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+      showToast(`"${updated.name}" approved and published`);
+      closeReview();
+    } catch {
+      showToast("Failed to approve and publish this listing");
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+
+  async function rejectReviewListing() {
+    if (!reviewListing || !rejectReason.trim()) return;
+    setReviewBusy(true);
+    try {
+      const updated = await apiClientFetch<Listing>(`/api/listings/${reviewListing.id}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ reason: rejectReason.trim() }),
+      });
+      setItems((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+      showToast(`"${updated.name}" rejected`);
+      closeReview();
+    } catch {
+      showToast("Failed to reject this listing");
+    } finally {
+      setReviewBusy(false);
     }
   }
 
@@ -396,7 +454,12 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
               )}
 
               <div className="mt-2 flex flex-wrap gap-2">
-                {listing.state !== "PUBLISHED" && (
+                {listing.state === "REVIEW" && (
+                  <Button size="sm" variant="primary" className="flex-1" onClick={() => openReview(listing)}>
+                    <Eye className="h-3.5 w-3.5" /> Review
+                  </Button>
+                )}
+                {listing.state !== "PUBLISHED" && listing.state !== "REVIEW" && (
                   <Button size="sm" variant="primary" className="flex-1" onClick={() => publishListing(listing.id)}>
                     <Rocket className="h-3.5 w-3.5" /> Publish
                   </Button>
@@ -754,6 +817,148 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
             )}
           </Button>
         </form>
+      </Modal>
+
+      <Modal open={Boolean(reviewListing)} onClose={closeReview} title="Review listing">
+        {reviewListing && (
+          <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
+            {reviewListing.images.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {reviewListing.images.slice(0, 6).map((src, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={src + i}
+                    src={resolveImageUrl(src)}
+                    alt={`${reviewListing.name} photo ${i + 1}`}
+                    className="aspect-square w-full rounded-lg object-cover"
+                  />
+                ))}
+              </div>
+            )}
+
+            <div>
+              <h3 className="font-heading text-base font-bold text-primary-900 dark:text-white">{reviewListing.name}</h3>
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <MapPin className="h-3 w-3 shrink-0" /> {reviewListing.location}, {reviewListing.city}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
+              <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800">
+                <p className="text-slate-400">Price</p>
+                <p className="mt-0.5 font-semibold text-primary-900 dark:text-white">
+                  {formatCurrency(reviewListing.pricePerNight, reviewListing.currency)} / night
+                </p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800">
+                <p className="text-slate-400">Minimum stay</p>
+                <p className="mt-0.5 font-semibold text-primary-900 dark:text-white">{reviewListing.minStayNights} nights</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800">
+                <p className="text-slate-400">Room</p>
+                <p className="mt-0.5 font-semibold text-primary-900 dark:text-white">
+                  {reviewListing.roomId !== null ? `#${reviewListing.roomId}` : "—"}
+                </p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800">
+                <p className="text-slate-400">Guests / Beds / Baths</p>
+                <p className="mt-0.5 font-semibold text-primary-900 dark:text-white">
+                  {reviewListing.guests} / {reviewListing.bedrooms} / {reviewListing.bathrooms}
+                </p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800">
+                <p className="text-slate-400">Submitted by</p>
+                <p className="mt-0.5 font-semibold text-primary-900 dark:text-white">
+                  {reviewListing.partyId !== null ? "Host (USER account)" : "Admin-created"}
+                </p>
+              </div>
+            </div>
+
+            {(reviewListing.contactName || reviewListing.contactPhone || reviewListing.contactEmail) && (
+              <div className="space-y-1 rounded-lg bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Host contact</p>
+                {reviewListing.contactName && (
+                  <p className="flex items-center gap-1.5 font-semibold"><Contact className="h-3 w-3 shrink-0" /> {reviewListing.contactName}</p>
+                )}
+                {reviewListing.contactPhone && (
+                  <p className="flex items-center gap-1.5"><Phone className="h-3 w-3 shrink-0" /> {reviewListing.contactPhone}</p>
+                )}
+                {reviewListing.contactEmail && (
+                  <p className="flex items-center gap-1.5 truncate"><Mail className="h-3 w-3 shrink-0" /> {reviewListing.contactEmail}</p>
+                )}
+              </div>
+            )}
+
+            {reviewListing.amenities.length > 0 && (
+              <div>
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Amenities</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300">{reviewListing.amenities.join(", ")}</p>
+              </div>
+            )}
+
+            {reviewListing.description && (
+              <div>
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Description</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300">{reviewListing.description}</p>
+              </div>
+            )}
+
+            {reviewSignals && (
+              <div
+                className={`rounded-xl px-3 py-2.5 text-xs ring-1 ${
+                  reviewSignals.eligible
+                    ? "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20"
+                    : "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20"
+                }`}
+              >
+                {reviewSignals.eligible ? (
+                  <p className="flex items-center gap-1.5 font-semibold">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> No compliance warnings.
+                  </p>
+                ) : (
+                  <>
+                    <p className="flex items-center gap-1.5 font-semibold">
+                      <AlertTriangle className="h-3.5 w-3.5" /> For your attention (does not block approval):
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                      {reviewSignals.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                Rejection reason (required to reject)
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={2}
+                placeholder="Explain what needs to change before this can be approved..."
+                className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                loading={reviewBusy}
+                disabled={!rejectReason.trim()}
+                onClick={rejectReviewListing}
+              >
+                <XCircle className="h-4 w-4" /> Reject
+              </Button>
+              <Button type="button" variant="primary" loading={reviewBusy} onClick={approveAndPublish}>
+                <CheckCircle2 className="h-4 w-4" /> Approve &amp; Publish
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {toast && (

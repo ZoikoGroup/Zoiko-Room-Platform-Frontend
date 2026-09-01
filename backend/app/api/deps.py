@@ -3,7 +3,7 @@ from collections.abc import Generator
 from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.security import decode_access_token, decode_access_token_claims
+from app.core.security import decode_access_token_claims
 from app.crud.admin import get_admin_by_email
 from app.crud.user import get_user_by_email
 from app.db.session import get_db
@@ -21,8 +21,14 @@ def get_current_admin(
     unauthorized = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     if not zoiko_admin_token:
         raise unauthorized
-    email = decode_access_token(zoiko_admin_token)
+    claims = decode_access_token_claims(zoiko_admin_token)
+    email = claims.get("sub") if claims else None
     if not email:
+        raise unauthorized
+    # Tokens without a "type" claim predate this check and are still honored --
+    # this only ever rejects a token that explicitly declares itself a "user" token.
+    token_type = claims.get("type")
+    if token_type is not None and token_type != "admin":
         raise unauthorized
     admin = get_admin_by_email(db, email)
     if not admin or not admin.is_active or admin.approval_status != "approved":
@@ -46,6 +52,11 @@ def get_current_user(
     claims = decode_access_token_claims(zoiko_user_token)
     email = claims.get("sub") if claims else None
     if not email:
+        raise unauthorized
+    # Tokens without a "type" claim predate this check and are still honored --
+    # this only ever rejects a token that explicitly declares itself an "admin" token.
+    token_type = claims.get("type") if claims else None
+    if token_type is not None and token_type != "user":
         raise unauthorized
     user = get_user_by_email(db, email)
     if not user or not user.is_active:

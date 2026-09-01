@@ -64,11 +64,17 @@ class ListingRead(ListingBase):
     rating: float
     review_count: int
     owner_id: int | None
+    party_id: int | None = None
     state: str
+    rejection_reason: str = ""
     market_release_id: int | None = None
     contact_name: str = ""
     contact_phone: str = ""
     contact_email: str = ""
+
+
+class ListingRejectRequest(CamelModel):
+    reason: str
 
 
 class PublicListingRead(ListingBase):

@@ -240,8 +240,10 @@ export function getHostedListingPublishEligibility(listingId: string): Promise<P
   return apiClientFetch<PublishEligibility>(`/api/users/hosting/listings/${listingId}/publish-eligibility`);
 }
 
-export function publishHostedListing(listingId: string): Promise<HostedListing> {
-  return apiClientFetch<HostedListing>(`/api/users/hosting/listings/${listingId}/publish`, {
+/** Publishing itself is always an explicit admin/super-admin decision -- a host can
+ *  only ask for review. */
+export function submitHostedListingForReview(listingId: string): Promise<HostedListing> {
+  return apiClientFetch<HostedListing>(`/api/users/hosting/listings/${listingId}/submit-for-review`, {
     method: "POST",
   });
 }

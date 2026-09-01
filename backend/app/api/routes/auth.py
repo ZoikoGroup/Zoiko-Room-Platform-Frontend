@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 def _set_auth_cookie(response: Response, email: str) -> None:
-    token = create_access_token(subject=email)
+    token = create_access_token(subject=email, token_type="admin")
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
