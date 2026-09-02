@@ -4,6 +4,7 @@ import {
   IdentityDocumentType,
   IdentityVerificationRecord,
   Property,
+  PublicListing,
   PublicListingsPage,
   PublishEligibility,
   Room,
@@ -95,6 +96,11 @@ export function listPublicListings(filters: PublicListingFilters = {}): Promise<
   params.set("limit", String(filters.limit ?? 20));
   params.set("offset", String(filters.offset ?? 0));
   return apiClientFetch<PublicListingsPage>(`/api/public/listings?${params.toString()}`);
+}
+
+/** Single-listing detail view -- same PUBLISHED-only visibility as the list endpoint. */
+export function getPublicListing(listingId: string): Promise<PublicListing> {
+  return apiClientFetch<PublicListing>(`/api/public/listings/${listingId}`);
 }
 
 export function submitRentalApplication(payload: {

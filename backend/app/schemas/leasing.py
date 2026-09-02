@@ -1,7 +1,15 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
+
+from pydantic import field_validator
 
 from app.schemas.booking import NewGuestInput
 from app.schemas.common import CamelModel
+
+
+def _reject_past_date(value: date | None) -> date | None:
+    if value is not None and value < datetime.now(timezone.utc).date():
+        raise ValueError("Desired move-in date cannot be in the past")
+    return value
 
 
 class ApplicationCreate(CamelModel):
@@ -10,6 +18,8 @@ class ApplicationCreate(CamelModel):
     new_guest: NewGuestInput | None = None
     message: str = ""
     desired_move_in: date | None = None
+
+    _validate_desired_move_in = field_validator("desired_move_in")(_reject_past_date)
 
 
 class ApplicationDecisionRead(CamelModel):
@@ -80,6 +90,7 @@ class OfferRead(CamelModel):
 class ApplicationRead(CamelModel):
     id: int
     listing_id: str
+    listing_name: str = ""
     guest_id: str
     guest_name: str
     guest_email: str
@@ -99,12 +110,15 @@ class UserApplicationSubmitRequest(CamelModel):
     message: str = ""
     desired_move_in: date | None = None
 
+    _validate_desired_move_in = field_validator("desired_move_in")(_reject_past_date)
+
 
 class UserApplicationRead(CamelModel):
     """User-facing application view."""
 
     id: int
     listing_id: str
+    listing_name: str = ""
     status: str
     message: str
     desired_move_in: date | None

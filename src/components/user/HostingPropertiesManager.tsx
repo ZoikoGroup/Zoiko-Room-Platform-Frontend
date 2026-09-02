@@ -18,12 +18,15 @@ import {
   updateHostedProperty,
   updateHostedRoom,
 } from "@/lib/user-api";
+import { ListARoomWizard } from "@/components/user/ListARoomWizard";
+import { useUserSession } from "@/components/user/UserSessionContext";
 import { Card, EmptyState, Field, SectionHeading, Toast, inputClass, useToast } from "@/components/user/ui";
 
 type PropertyForm = { id: number | null; address: string; city: string };
 type RoomForm = { propertyId: number; id: number | null; size: string; hasEnsuite: boolean };
 
 export function HostingPropertiesManager() {
+  const { user } = useUserSession();
   const { toast, showToast } = useToast();
   const [properties, setProperties] = useState<Property[]>([]);
   const [roomsByProperty, setRoomsByProperty] = useState<Record<number, Room[]>>({});
@@ -31,6 +34,7 @@ export function HostingPropertiesManager() {
 
   const [propertyForm, setPropertyForm] = useState<PropertyForm | null>(null);
   const [roomForm, setRoomForm] = useState<RoomForm | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -115,11 +119,16 @@ export function HostingPropertiesManager() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SectionHeading
           title="Your properties"
-          subtitle="Add a property, then add the rooms you want to host. Listings are created from rooms."
+          subtitle="List a room in a few steps, or manage your properties and rooms individually below."
         />
-        <Button size="sm" onClick={() => setPropertyForm({ id: null, address: "", city: "" })}>
-          <Plus className="h-4 w-4" /> Add Property
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setPropertyForm({ id: null, address: "", city: "" })}>
+            <Plus className="h-4 w-4" /> Add Property
+          </Button>
+          <Button size="sm" onClick={() => setWizardOpen(true)}>
+            <Plus className="h-4 w-4" /> List a Room
+          </Button>
+        </div>
       </div>
 
       {properties.length === 0 ? (
@@ -128,7 +137,10 @@ export function HostingPropertiesManager() {
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
               <Building2 className="h-6 w-6" />
             </span>
-            <EmptyState message="You are not hosting any properties yet. Add your first one to get started." />
+            <EmptyState message="You are not hosting any rooms yet." />
+            <Button size="sm" onClick={() => setWizardOpen(true)}>
+              <Plus className="h-4 w-4" /> List a Room
+            </Button>
           </div>
         </Card>
       ) : (
@@ -220,9 +232,9 @@ export function HostingPropertiesManager() {
           })}
 
           <p className="text-center text-xs text-slate-400">
-            Ready to advertise a room?{" "}
+            Manage your listings, photos and pricing from{" "}
             <Link href="/account/host/listings" className="font-semibold text-primary-700 dark:text-primary-300">
-              Create a listing
+              My Listings
             </Link>
           </p>
         </div>
@@ -312,6 +324,17 @@ export function HostingPropertiesManager() {
           </div>
         </form>
       </Modal>
+
+      <ListARoomWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        contact={{ name: user?.fullName ?? "", phone: user?.phone ?? "", email: user?.email ?? "" }}
+        onCreated={async () => {
+          setWizardOpen(false);
+          await load();
+          showToast("Draft listing created — find it under My Listings when you're ready to submit it for review.");
+        }}
+      />
 
       <Toast toast={toast} />
     </div>

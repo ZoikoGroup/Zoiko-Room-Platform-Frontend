@@ -69,13 +69,14 @@ export function ApplicationsManager() {
     <div className="space-y-3">
       {applications.map((application) => (
         <Card key={application.id} className="flex flex-wrap items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="font-heading text-sm font-bold text-primary-900 dark:text-white">
-                {application.listingId}
+          <Link href={`/account/rent/${application.listingId}`} className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-heading text-sm font-bold text-primary-900 hover:underline dark:text-white">
+                {application.listingName || application.listingId}
               </p>
               <Badge tone={applicationStatusTone[application.status] ?? "neutral"}>{application.status}</Badge>
             </div>
+            <p className="mt-0.5 text-xs text-slate-400">Application #{application.listingId}</p>
             <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
               <span className="flex items-center gap-1">
                 <CalendarClock className="h-3 w-3" /> Submitted {formatDate(application.submittedAt)}
@@ -85,7 +86,7 @@ export function ApplicationsManager() {
             {application.message && (
               <p className="mt-2 max-w-xl text-xs text-slate-500 dark:text-slate-400">“{application.message}”</p>
             )}
-          </div>
+          </Link>
 
           {application.status === "SUBMITTED" && (
             <Button

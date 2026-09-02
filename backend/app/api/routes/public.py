@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.crud.leasing import submit_application, to_application_read
-from app.crud.listing import list_public_listings, to_public_listing_read
+from app.crud.listing import get_listing, list_public_listings, to_public_listing_read
 from app.db.session import get_db
 from app.schemas.leasing import ApplicationCreate, ApplicationRead
-from app.schemas.listing import PublicListingsPage
+from app.schemas.listing import PublicListingRead, PublicListingsPage
 
 router = APIRouter(prefix="/api/public", tags=["public"])
 
@@ -41,6 +41,17 @@ def get_public_listings(
         total=total,
         has_more=offset + len(listings) < total,
     )
+
+
+@router.get("/listings/{listing_id}", response_model=PublicListingRead)
+def get_public_listing(listing_id: str, db: Session = Depends(get_db)):
+    """Single-listing detail view. Same visibility rule as the list endpoint --
+    only ever returns a PUBLISHED listing, so a draft/paused/withdrawn listing
+    is never reachable by guessing its id."""
+    listing = get_listing(db, listing_id)
+    if not listing or listing.state != "PUBLISHED":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Listing not found")
+    return to_public_listing_read(listing)
 
 
 @router.post("/applications", response_model=ApplicationRead, status_code=status.HTTP_201_CREATED)

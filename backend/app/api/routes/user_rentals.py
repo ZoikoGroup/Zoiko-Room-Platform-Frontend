@@ -27,6 +27,23 @@ from app.schemas.leasing import UserApplicationRead, UserApplicationSubmitReques
 router = APIRouter(prefix="/api/users/rentals", tags=["user-rentals"])
 
 
+def _to_user_application_read(db: Session, application: Application) -> UserApplicationRead:
+    """listing_name is looked up here (not stored on Application) so it always
+    reflects the listing's current name; falls back to "" if the listing was
+    since deleted, which the frontend renders gracefully."""
+    listing = db.get(Listing, application.listing_id)
+    return UserApplicationRead(
+        id=application.id,
+        listing_id=application.listing_id,
+        listing_name=listing.name if listing else "",
+        status=application.status,
+        message=application.message,
+        desired_move_in=application.desired_move_in,
+        submitted_at=application.submitted_at,
+        updated_at=application.updated_at,
+    )
+
+
 def _get_or_create_user_guest(db: Session, user: UserAccount) -> Guest:
     """Get or create a Guest entry linked to a user."""
     existing = db.scalar(select(Guest).where(Guest.email == user.email))
@@ -96,15 +113,7 @@ def submit_rental_application(
 
         db.commit()
 
-        return UserApplicationRead(
-            id=application.id,
-            listing_id=application.listing_id,
-            status=application.status,
-            message=application.message,
-            desired_move_in=application.desired_move_in,
-            submitted_at=application.submitted_at,
-            updated_at=application.updated_at,
-        )
+        return _to_user_application_read(db, application)
     except Exception as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
 
@@ -131,18 +140,7 @@ def list_user_applications(
         )
     )
 
-    return [
-        UserApplicationRead(
-            id=app.id,
-            listing_id=app.listing_id,
-            status=app.status,
-            message=app.message,
-            desired_move_in=app.desired_move_in,
-            submitted_at=app.submitted_at,
-            updated_at=app.updated_at,
-        )
-        for app in applications
-    ]
+    return [_to_user_application_read(db, app) for app in applications]
 
 
 @router.get("/applications/{application_id}", response_model=UserApplicationRead)
@@ -161,15 +159,7 @@ def get_application_details(
     if not guest or application.guest_id != guest.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only view your own applications")
 
-    return UserApplicationRead(
-        id=application.id,
-        listing_id=application.listing_id,
-        status=application.status,
-        message=application.message,
-        desired_move_in=application.desired_move_in,
-        submitted_at=application.submitted_at,
-        updated_at=application.updated_at,
-    )
+    return _to_user_application_read(db, application)
 
 
 @router.post("/applications/{application_id}/withdraw", response_model=UserApplicationRead)
@@ -208,15 +198,7 @@ def withdraw_application(
     )
     db.commit()
 
-    return UserApplicationRead(
-        id=application.id,
-        listing_id=application.listing_id,
-        status=application.status,
-        message=application.message,
-        desired_move_in=application.desired_move_in,
-        submitted_at=application.submitted_at,
-        updated_at=application.updated_at,
-    )
+    return _to_user_application_read(db, application)
 
 
 @router.get("/occupancies", response_model=list[UserOccupancyRead])

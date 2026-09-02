@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import Link from "next/link";
 import { AlertTriangle, BedDouble, MapPin, Pencil, Plus, Send, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -21,6 +20,7 @@ import {
   updateHostedListing,
 } from "@/lib/user-api";
 import { IdentityGate } from "@/components/user/IdentityGate";
+import { ListARoomWizard } from "@/components/user/ListARoomWizard";
 import { useUserSession } from "@/components/user/UserSessionContext";
 import { Card, EmptyState, Field, SectionHeading, Toast, inputClass, useToast } from "@/components/user/ui";
 import { ImageGalleryUploader } from "@/components/admin/ImageGalleryUploader";
@@ -51,30 +51,6 @@ interface ListingFormState {
   contactName: string;
   contactPhone: string;
   contactEmail: string;
-}
-
-function emptyForm(contact: { name: string; phone: string; email: string }): ListingFormState {
-  return {
-    id: null,
-    name: "",
-    roomId: "",
-    roomType: "Private room",
-    city: "",
-    location: "",
-    pricePerNight: "",
-    currency: "INR",
-    guests: "1",
-    bedrooms: "1",
-    bathrooms: "1",
-    size: "0",
-    minStayNights: "30",
-    description: "",
-    amenities: "",
-    images: [],
-    contactName: contact.name,
-    contactPhone: contact.phone,
-    contactEmail: contact.email,
-  };
 }
 
 function toFormState(listing: HostedListing): ListingFormState {
@@ -118,6 +94,7 @@ export function HostingListingsManager() {
   const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState<ListingFormState | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -154,13 +131,6 @@ export function HostingListingsManager() {
       ),
     [properties, roomsByProperty]
   );
-
-  function openCreate() {
-    setError("");
-    setForm(
-      emptyForm({ name: user?.fullName ?? "", phone: user?.phone ?? "", email: user?.email ?? "" })
-    );
-  }
 
   function openEdit(listing: HostedListing) {
     setError("");
@@ -256,30 +226,12 @@ export function HostingListingsManager() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SectionHeading
           title="Your listings"
-          subtitle="Create a draft from one of your rooms, then submit it for a Zoiko admin to review and publish."
+          subtitle="Submit a listing for review when it's ready, then publish once a Zoiko admin approves it."
         />
-        <Button size="sm" onClick={openCreate} disabled={roomOptions.length === 0}>
-          <Plus className="h-4 w-4" /> Create Listing
+        <Button size="sm" onClick={() => setWizardOpen(true)}>
+          <Plus className="h-4 w-4" /> List a Room
         </Button>
       </div>
-
-      {roomOptions.length === 0 && (
-        <Card className="!bg-amber-50 !ring-amber-200 dark:!bg-amber-500/10 dark:!ring-amber-500/20">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-            <div>
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">You have no rooms yet</p>
-              <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
-                Every listing must be linked to a room you own.{" "}
-                <Link href="/account/host" className="font-semibold underline">
-                  Add a property and a room
-                </Link>{" "}
-                first.
-              </p>
-            </div>
-          </div>
-        </Card>
-      )}
 
       {listings.length === 0 ? (
         <Card>
@@ -287,7 +239,10 @@ export function HostingListingsManager() {
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
               <BedDouble className="h-6 w-6" />
             </span>
-            <EmptyState message="You have not created any listings yet." />
+            <EmptyState message="You have not listed any rooms yet." />
+            <Button size="sm" onClick={() => setWizardOpen(true)}>
+              <Plus className="h-4 w-4" /> List a Room
+            </Button>
           </div>
         </Card>
       ) : (
@@ -538,6 +493,17 @@ export function HostingListingsManager() {
           </div>
         </form>
       </Modal>
+
+      <ListARoomWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        contact={{ name: user?.fullName ?? "", phone: user?.phone ?? "", email: user?.email ?? "" }}
+        onCreated={async () => {
+          setWizardOpen(false);
+          await load();
+          showToast("Draft listing created.");
+        }}
+      />
 
       <Toast toast={toast} />
     </div>
