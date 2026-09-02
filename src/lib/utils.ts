@@ -40,6 +40,17 @@ export function formatDate(date: string) {
   });
 }
 
+/** Today as a "YYYY-MM-DD" string in the browser's local timezone -- matches
+ *  what `<input type="date">` both displays and compares against, so this is
+ *  the right "today" for a `min` attribute or a client-side past-date check
+ *  (as opposed to UTC, which could be a day off from the user's actual today). */
+export function todayIsoDate(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 /** Listing/property photo URLs are a mix of genuine external URLs (e.g. the

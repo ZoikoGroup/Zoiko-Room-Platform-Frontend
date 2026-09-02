@@ -24,6 +24,7 @@ def to_application_read(application: Application) -> ApplicationRead:
     return ApplicationRead(
         id=application.id,
         listing_id=application.listing_id,
+        listing_name=application.listing.name if application.listing else "",
         guest_id=application.guest_id,
         guest_name=application.guest.name,
         guest_email=application.guest.email,

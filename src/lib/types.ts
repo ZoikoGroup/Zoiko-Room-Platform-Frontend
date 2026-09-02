@@ -274,6 +274,7 @@ export interface Offer {
 export interface Application {
   id: number;
   listingId: string;
+  listingName: string;
   guestId: string;
   guestName: string;
   guestEmail: string;
@@ -514,6 +515,9 @@ export interface AdminIdentityVerification {
 export interface UserApplication {
   id: number;
   listingId: string;
+  /** May be empty if the listing was since deleted -- render listingId as a
+   *  fallback in that case rather than a blank heading. */
+  listingName: string;
   status: ApplicationStatus;
   message: string;
   desiredMoveIn: string | null;

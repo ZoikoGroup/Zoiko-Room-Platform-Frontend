@@ -13,6 +13,7 @@ import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  resolveNotificationHref,
 } from "@/lib/notifications";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Bell, BedDouble, CalendarRange, ChevronDown, Loader2, LogOut, Menu, Search, Settings, UserCircle2, Users } from "lucide-react";
@@ -92,6 +93,9 @@ export function Topbar({
         refreshUnreadCount();
       }
     }
+    setNotifOpen(false);
+    const href = resolveNotificationHref(notification, "admin");
+    if (href) router.push(href);
   }
 
   async function handleMarkAllRead() {

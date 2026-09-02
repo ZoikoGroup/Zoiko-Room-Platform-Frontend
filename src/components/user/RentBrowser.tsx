@@ -1,15 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Bath, BedDouble, ChevronLeft, ChevronRight, MapPin, Ruler, Search, Send, Users } from "lucide-react";
+import { AlertTriangle, Bath, BedDouble, ChevronLeft, ChevronRight, MapPin, Ruler, Search, Users } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
 import { Loader } from "@/components/ui/Loader";
 import { PublicListing } from "@/lib/types";
 import { formatCurrency, resolveImageUrl } from "@/lib/utils";
-import { errorMessage, listPublicListings, listRentalApplications, submitRentalApplication } from "@/lib/user-api";
+import { errorMessage, listPublicListings, listRentalApplications } from "@/lib/user-api";
+import { ApplyForRoomModal } from "@/components/user/ApplyForRoomModal";
 import { IdentityGate } from "@/components/user/IdentityGate";
 import { useUserSession } from "@/components/user/UserSessionContext";
 import { Card, EmptyState, Field, Toast, inputClass, useToast } from "@/components/user/ui";
@@ -42,10 +42,6 @@ export function RentBrowser() {
   const [loadError, setLoadError] = useState("");
 
   const [selected, setSelected] = useState<PublicListing | null>(null);
-  const [message, setMessage] = useState("");
-  const [desiredMoveIn, setDesiredMoveIn] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
 
   // Applications only need to be read once -- they don't depend on the filters/page.
   useEffect(() => {
@@ -114,30 +110,12 @@ export function RentBrowser() {
 
   function openApply(listing: PublicListing) {
     setSelected(listing);
-    setMessage("");
-    setDesiredMoveIn("");
-    setError("");
   }
 
-  async function handleApply(e: FormEvent) {
-    e.preventDefault();
-    if (!selected) return;
-    setError("");
-    setSubmitting(true);
-    try {
-      await submitRentalApplication({
-        listingId: selected.id,
-        message: message.trim(),
-        desiredMoveIn: desiredMoveIn || null,
-      });
-      setAppliedListingIds((prev) => new Set(prev).add(selected.id));
-      setSelected(null);
-      showToast("Application submitted. Track it under My Applications.");
-    } catch (err) {
-      setError(errorMessage(err, "Could not submit your application."));
-    } finally {
-      setSubmitting(false);
-    }
+  function handleApplied(listingId: string) {
+    setAppliedListingIds((prev) => new Set(prev).add(listingId));
+    setSelected(null);
+    showToast("Application submitted. Track it under My Applications.");
   }
 
   const hasActiveFilters = Boolean(filters.city || filters.roomType || filters.minPrice || filters.maxPrice);
@@ -224,20 +202,22 @@ export function RentBrowser() {
                   key={listing.id}
                   className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg dark:bg-slate-900 dark:ring-white/10"
                 >
-                  {listing.images[0] ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={resolveImageUrl(listing.images[0])} alt={listing.name} className="h-44 w-full object-cover" />
-                  ) : (
-                    <div className="flex h-44 w-full items-center justify-center bg-primary-50 dark:bg-primary-500/10">
-                      <BedDouble className="h-8 w-8 text-primary-300" />
-                    </div>
-                  )}
+                  <Link href={`/account/rent/${listing.id}`} className="block">
+                    {listing.images[0] ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={resolveImageUrl(listing.images[0])} alt={listing.name} className="h-44 w-full object-cover" />
+                    ) : (
+                      <div className="flex h-44 w-full items-center justify-center bg-primary-50 dark:bg-primary-500/10">
+                        <BedDouble className="h-8 w-8 text-primary-300" />
+                      </div>
+                    )}
+                  </Link>
 
                   <div className="flex flex-1 flex-col p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-heading text-sm font-bold text-primary-900 dark:text-white">{listing.name}</p>
+                    <Link href={`/account/rent/${listing.id}`} className="flex items-start justify-between gap-2">
+                      <p className="font-heading text-sm font-bold text-primary-900 dark:text-white hover:underline">{listing.name}</p>
                       <Badge tone="primary">{listing.roomType}</Badge>
-                    </div>
+                    </Link>
 
                     <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                       <MapPin className="h-3.5 w-3.5" /> {listing.location}, {listing.city}
@@ -302,51 +282,7 @@ export function RentBrowser() {
         </>
       )}
 
-      <Modal open={Boolean(selected)} onClose={() => setSelected(null)} title={`Apply for ${selected?.name ?? ""}`}>
-        <form onSubmit={handleApply} className="space-y-4">
-          <div className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
-            <p>
-              {selected?.location}, {selected?.city} — {selected ? formatCurrency(selected.pricePerNight, selected.currency) : ""} / night,
-              minimum {selected?.minStayNights} nights.
-            </p>
-            <p className="mt-1">Host contact: {selected?.ownerName || "Zoiko host"}</p>
-          </div>
-
-          <Field label="Desired move-in date">
-            <input
-              type="date"
-              value={desiredMoveIn}
-              onChange={(e) => setDesiredMoveIn(e.target.value)}
-              className={inputClass}
-            />
-          </Field>
-
-          <Field label="Message to the host" hint="Tell the host a little about yourself and your stay.">
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={4}
-              placeholder="I'm relocating for work and looking for a 6-month stay..."
-              className={inputClass}
-            />
-          </Field>
-
-          {error && (
-            <p className="rounded-lg bg-accent-50 px-3 py-2 text-xs font-medium text-accent-700 ring-1 ring-accent-200">
-              {error}
-            </p>
-          )}
-
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setSelected(null)}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={submitting}>
-              <Send className="h-4 w-4" /> Submit application
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      <ApplyForRoomModal listing={selected} onClose={() => setSelected(null)} onApplied={handleApplied} />
 
       <p className="text-center text-xs text-slate-400">
         Already applied somewhere?{" "}

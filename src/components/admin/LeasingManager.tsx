@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { apiClientFetch } from "@/lib/api-client";
 import { getCurrentAdmin } from "@/lib/auth";
-import { agreementStatusTone, offerStatusTone } from "@/lib/status";
+import { agreementStatusLabel, agreementStatusTone, offerStatusLabel, offerStatusTone } from "@/lib/status";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -333,9 +333,13 @@ export function LeasingManager() {
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="font-heading text-sm font-bold text-primary-900 dark:text-white">{application.guestName}</p>
+                <p className="font-heading text-sm font-bold text-primary-900 dark:text-white">
+                  {application.guestName} <span className="font-normal text-slate-400">applied for</span>{" "}
+                  {application.listingName || application.listingId}
+                </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {application.listingId} · {application.guestEmail} · applied {formatDate(application.submittedAt)}
+                  Application #{application.id} · {application.listingId} · {application.guestEmail} · applied{" "}
+                  {formatDate(application.submittedAt)}
                 </p>
               </div>
               <Badge tone={display.tone}>{display.label}</Badge>
@@ -382,7 +386,7 @@ export function LeasingManager() {
               <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Offer</p>
-                  <Badge tone={offerStatusTone[offer.status]}>{offer.status}</Badge>
+                  <Badge tone={offerStatusTone[offer.status]}>{offerStatusLabel[offer.status] ?? offer.status}</Badge>
                 </div>
                 {latestTerms ? (
                   <p className="text-sm text-slate-700 dark:text-slate-200">
@@ -426,7 +430,7 @@ export function LeasingManager() {
               <div className="mt-2 space-y-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Agreement</p>
-                  <Badge tone={agreementStatusTone[agreement.status]}>{agreement.status}</Badge>
+                  <Badge tone={agreementStatusTone[agreement.status]}>{agreementStatusLabel[agreement.status] ?? agreement.status}</Badge>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Provider signed: {agreement.signedByProviderAt ? formatDate(agreement.signedByProviderAt) : "Not yet"} · Renter

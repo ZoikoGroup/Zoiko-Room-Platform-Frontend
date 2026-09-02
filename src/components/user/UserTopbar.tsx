@@ -16,6 +16,7 @@ import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  resolveNotificationHref,
 } from "@/lib/notifications";
 
 const NOTIFICATION_POLL_MS = 45_000;
@@ -83,6 +84,9 @@ export function UserTopbar({ onOpenMobileSidebar }: { onOpenMobileSidebar: () =>
         refreshUnreadCount();
       }
     }
+    setNotifOpen(false);
+    const href = resolveNotificationHref(notification, "user");
+    if (href) router.push(href);
   }
 
   async function handleMarkAllRead() {

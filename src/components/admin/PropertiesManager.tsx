@@ -93,6 +93,26 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
     getCurrentAdmin().then((admin) => setRole(admin?.role ?? null));
   }, []);
 
+  // Deep-link from a "listing pending review" notification (see
+  // resolveNotificationHref in lib/notifications.ts) -- open straight to the
+  // review flow for that listing rather than making the admin find it manually.
+  useEffect(() => {
+    const targetId = searchParams.get("listingId");
+    if (!targetId) return;
+    const target = items.find((l) => l.id === targetId);
+    if (target) {
+      if (target.state === "REVIEW") {
+        openReview(target);
+      } else {
+        openEditModal(target);
+      }
+    } else {
+      setToast("That listing could not be found — it may have been removed.");
+    }
+    // Only ever react to the query param changing, not to every items/toast update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   async function loadRoomOptions() {
     try {
       const properties = await apiClientFetch<Property[]>("/api/properties");

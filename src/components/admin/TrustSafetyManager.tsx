@@ -8,25 +8,17 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { apiClientFetch } from "@/lib/api-client";
 import { formatDate } from "@/lib/utils";
+import {
+  authorityRecordStatusLabel,
+  authorityRecordStatusTone,
+  formatClassificationLabel,
+  marketReleaseStatusLabel,
+  marketReleaseStatusTone,
+  occupancyReviewStateLabel,
+  occupancyReviewStateTone,
+} from "@/lib/status";
 
 type RoomOption = Room & { property: Property };
-
-const authorityTone = {
-  not_started: "neutral",
-  pending: "warning",
-  verified: "success",
-  expiring: "warning",
-  expired: "danger",
-  failed: "danger",
-  conflict: "danger",
-  review_required: "warning",
-} as const;
-
-const reviewStateTone: Record<OccupancyReviewState, "success" | "warning" | "neutral"> = {
-  UNKNOWN: "neutral",
-  UNSUPPORTED: "warning",
-  APPROVED: "success",
-};
 
 const emptyReleaseForm = { jurisdiction: "IN", minStayNights: "30" };
 const emptyClassifyForm = { classification: "shared_residential_room", confidence: "1", evidenceRef: "", reviewState: "APPROVED" as OccupancyReviewState };
@@ -200,11 +192,12 @@ export function TrustSafetyManager() {
             <h2 className="font-heading text-base font-bold text-primary-900 dark:text-white">Market Releases</h2>
           </div>
           <Button size="sm" variant="accent" onClick={() => setReleaseModalOpen(true)}>
-            <Plus className="h-3.5 w-3.5" /> New Release
+            <Plus className="h-3.5 w-3.5" /> Configure Market Release
           </Button>
         </div>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          A jurisdiction can only accept published listings once its market release is active.
+          A Market Release controls whether a jurisdiction is enabled for listing publication. This is an
+          informational compliance signal for admin review — it does not automatically block publishing a listing.
         </p>
         <div className="mt-4 space-y-2">
           {releases.map((release) => (
@@ -217,9 +210,7 @@ export function TrustSafetyManager() {
                 <p className="text-xs text-slate-500 dark:text-slate-400">Min stay: {release.minStayNights} nights</p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge tone={release.status === "active" ? "success" : release.status === "disabled" ? "danger" : "neutral"}>
-                  {release.status}
-                </Badge>
+                <Badge tone={marketReleaseStatusTone[release.status]}>{marketReleaseStatusLabel[release.status]}</Badge>
                 {release.status !== "active" && (
                   <Button size="sm" variant="primary" onClick={() => setReleaseStatus(release.id, "approve")}>
                     Activate
@@ -244,11 +235,13 @@ export function TrustSafetyManager() {
             <h2 className="font-heading text-base font-bold text-primary-900 dark:text-white">Authority Records</h2>
           </div>
           <Button size="sm" variant="accent" onClick={() => setAuthorityModalOpen(true)}>
-            <Plus className="h-3.5 w-3.5" /> Submit Record
+            <Plus className="h-3.5 w-3.5" /> Add Authority Record
           </Button>
         </div>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          A room can only publish once it has a verified, unexpired right-to-list record.
+          An Authority Record is evidence that a host has the right to offer a room (e.g. a lease agreement,
+          ownership deed, or NOC). Verifying it here is an informational compliance signal for admin review — it
+          does not automatically block publishing a listing.
         </p>
         <div className="mt-4 space-y-2">
           {authorityRecords.map((record) => (
@@ -266,7 +259,7 @@ export function TrustSafetyManager() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge tone={authorityTone[record.status]}>{record.status.replace("_", " ")}</Badge>
+                <Badge tone={authorityRecordStatusTone[record.status]}>{authorityRecordStatusLabel[record.status]}</Badge>
                 {record.status === "pending" && (
                   <>
                     <Button size="sm" variant="primary" onClick={() => verifyAuthority(record.id)}>
@@ -292,7 +285,9 @@ export function TrustSafetyManager() {
           <h2 className="font-heading text-base font-bold text-primary-900 dark:text-white">Occupancy Classification</h2>
         </div>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Every room defaults to UNKNOWN and fails closed — a listing cannot publish until this is resolved.
+          Occupancy Classification records what type of accommodation a room represents (e.g. a shared residential
+          room). This is an informational compliance signal for admin review — it does not automatically block
+          publishing a listing.
         </p>
         <div className="mt-4 space-y-2">
           {rooms.map((room) => {
@@ -308,13 +303,13 @@ export function TrustSafetyManager() {
                     Room #{room.id} — {room.property.address}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {classification?.classification || "Not classified"}
+                    {formatClassificationLabel(classification?.classification ?? "")}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge tone={reviewStateTone[reviewState]}>{reviewState}</Badge>
+                  <Badge tone={occupancyReviewStateTone[reviewState]}>{occupancyReviewStateLabel[reviewState]}</Badge>
                   <Button size="sm" variant="outline" onClick={() => openClassifyModal(room)}>
-                    <ShieldX className="h-3.5 w-3.5" /> Set Classification
+                    <ShieldX className="h-3.5 w-3.5" /> {classification ? "Change Classification" : "Set Classification"}
                   </Button>
                 </div>
               </div>
@@ -324,7 +319,7 @@ export function TrustSafetyManager() {
         </div>
       </section>
 
-      <Modal open={releaseModalOpen} onClose={() => setReleaseModalOpen(false)} title="New Market Release">
+      <Modal open={releaseModalOpen} onClose={() => setReleaseModalOpen(false)} title="Configure Market Release">
         <form onSubmit={createRelease} className="space-y-3.5">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -357,7 +352,7 @@ export function TrustSafetyManager() {
         </form>
       </Modal>
 
-      <Modal open={authorityModalOpen} onClose={() => setAuthorityModalOpen(false)} title="Submit Authority Record">
+      <Modal open={authorityModalOpen} onClose={() => setAuthorityModalOpen(false)} title="Add Authority Record">
         <form onSubmit={submitAuthorityRecord} className="space-y-3.5">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -429,9 +424,9 @@ export function TrustSafetyManager() {
               onChange={(e) => setClassifyForm((f) => ({ ...f, reviewState: e.target.value as OccupancyReviewState }))}
               className="w-full rounded-xl bg-slate-50 px-4 py-2.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-700"
             >
-              <option value="UNKNOWN">UNKNOWN (blocks publish)</option>
-              <option value="UNSUPPORTED">UNSUPPORTED (blocks publish)</option>
-              <option value="APPROVED">APPROVED</option>
+              <option value="UNKNOWN">Not yet classified</option>
+              <option value="UNSUPPORTED">Classification unresolved</option>
+              <option value="APPROVED">Approved</option>
             </select>
           </div>
           <div>

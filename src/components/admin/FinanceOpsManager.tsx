@@ -8,7 +8,16 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { apiClientFetch } from "@/lib/api-client";
 import { getCurrentAdmin } from "@/lib/auth";
-import { disputeStatusTone, payoutStatusTone, reconciliationStatusTone, refundStatusTone } from "@/lib/status";
+import {
+  disputeStatusLabel,
+  disputeStatusTone,
+  payoutStatusLabel,
+  payoutStatusTone,
+  reconciliationStatusLabel,
+  reconciliationStatusTone,
+  refundStatusLabel,
+  refundStatusTone,
+} from "@/lib/status";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 const emptyPayoutForm = { partyId: "", periodKey: "" };
@@ -180,7 +189,7 @@ export function FinanceOpsManager() {
                 </p>
                 {payout.holdReason && <p className="text-xs text-accent-600">{payout.holdReason}</p>}
               </div>
-              <Badge tone={payoutStatusTone[payout.status]}>{payout.status}</Badge>
+              <Badge tone={payoutStatusTone[payout.status]}>{payoutStatusLabel[payout.status] ?? payout.status}</Badge>
             </div>
           ))}
           {payouts.length === 0 && <p className="text-sm text-slate-400">No payouts yet.</p>}
@@ -207,7 +216,7 @@ export function FinanceOpsManager() {
                 <p className="text-xs text-slate-500 dark:text-slate-400">{refund.reason || "No reason given"}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge tone={refundStatusTone[refund.status]}>{refund.status}</Badge>
+                <Badge tone={refundStatusTone[refund.status]}>{refundStatusLabel[refund.status] ?? refund.status}</Badge>
                 {refund.status === "REQUESTED" && (
                   <>
                     <Button size="sm" variant="primary" onClick={() => decideRefund(refund.id, true)}>
@@ -243,7 +252,7 @@ export function FinanceOpsManager() {
                 <p className="text-xs text-slate-500 dark:text-slate-400">{dispute.description || "No description"}</p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge tone={disputeStatusTone[dispute.status]}>{dispute.status}</Badge>
+                <Badge tone={disputeStatusTone[dispute.status]}>{disputeStatusLabel[dispute.status] ?? dispute.status}</Badge>
                 {dispute.status === "OPEN" && (
                   <>
                     <Button size="sm" variant="primary" onClick={() => resolveDispute(dispute.id, true)}>
@@ -280,7 +289,7 @@ export function FinanceOpsManager() {
               <div key={run.id} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-primary-900 dark:text-white">{formatDate(run.runAt)}</p>
-                  <Badge tone={reconciliationStatusTone[run.status]}>{run.status}</Badge>
+                  <Badge tone={reconciliationStatusTone[run.status]}>{reconciliationStatusLabel[run.status] ?? run.status}</Badge>
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-3">
                   {Object.entries(run.totals).map(([key, value]) => (

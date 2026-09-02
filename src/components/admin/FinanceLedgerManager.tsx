@@ -6,7 +6,7 @@ import { DepositRecord, Obligation } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { apiClientFetch } from "@/lib/api-client";
-import { depositStatusTone, obligationStatusTone } from "@/lib/status";
+import { depositStatusLabel, depositStatusTone, obligationStatusLabel, obligationStatusTone } from "@/lib/status";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export function FinanceLedgerManager() {
@@ -54,10 +54,10 @@ export function FinanceLedgerManager() {
         method: "POST",
         body: JSON.stringify({ allocations: [{ obligationId: obligation.id, amount: obligation.amount }] }),
       });
-      showToast(`${obligation.obligationType} obligation paid in full`);
+      showToast(`Recorded ${obligation.obligationType.toLowerCase()} obligation as paid in full`);
       loadAll();
     } catch {
-      showToast("Payment failed");
+      showToast("Could not record this payment");
     } finally {
       setPayingId(null);
     }
@@ -95,7 +95,9 @@ export function FinanceLedgerManager() {
           <h2 className="font-heading text-base font-bold text-primary-900 dark:text-white">Obligations</h2>
         </div>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Rent, deposits, fees and tax — each an explicit money type, never a generic amount-due field.
+          What each tenant owes the platform — rent, deposits, fees and tax. There is no live payment gateway
+          connected yet, so &quot;Record Payment in Full&quot; marks an obligation paid in Zoiko&apos;s own records; it
+          does not charge the tenant or move real money.
         </p>
         <div className="mt-4 space-y-2">
           {obligations.map((obligation) => (
@@ -108,14 +110,14 @@ export function FinanceLedgerManager() {
                   {obligation.obligationType} · {formatCurrency(obligation.amount)}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Due {formatDate(obligation.dueDate)} · {obligation.moneyPlane} plane · guest {obligation.guestId}
+                  Owed by guest {obligation.guestId} · due {formatDate(obligation.dueDate)} · {obligation.moneyPlane.toLowerCase()} plane
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge tone={obligationStatusTone[obligation.status]}>{obligation.status}</Badge>
+                <Badge tone={obligationStatusTone[obligation.status]}>{obligationStatusLabel[obligation.status] ?? obligation.status}</Badge>
                 {(obligation.status === "PENDING" || obligation.status === "PARTIALLY_PAID") && (
                   <Button size="sm" variant="primary" disabled={payingId === obligation.id} onClick={() => payInFull(obligation)}>
-                    <CreditCard className="h-3.5 w-3.5" /> {payingId === obligation.id ? "Paying…" : "Pay in Full"}
+                    <CreditCard className="h-3.5 w-3.5" /> {payingId === obligation.id ? "Recording…" : "Record Payment in Full"}
                   </Button>
                 )}
               </div>
@@ -146,7 +148,7 @@ export function FinanceLedgerManager() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Badge tone={depositStatusTone[deposit.status]}>{deposit.status}</Badge>
+                <Badge tone={depositStatusTone[deposit.status]}>{depositStatusLabel[deposit.status] ?? deposit.status}</Badge>
                 {(deposit.status === "HELD" || deposit.status === "PARTIALLY_RELEASED") && (
                   <>
                     <Button size="sm" variant="primary" onClick={() => releaseDeposit(deposit)}>
