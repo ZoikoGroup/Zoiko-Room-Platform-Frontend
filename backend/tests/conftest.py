@@ -35,6 +35,34 @@ def _compile_array_sqlite(self, type_, **kw):  # noqa: D401
     return "TEXT"
 
 
+# The DDL patch above only gets CREATE TABLE to succeed -- it says nothing about
+# how values are bound/read. postgresql.ARRAY has no generic (non-psycopg) bind/
+# result processor, so without this, inserting an actual Python list (e.g.
+# Listing.images/amenities/tags) raises "Error binding parameter: type 'list' is
+# not supported". JSON-encode on the way in, decode on the way out -- this is
+# process-global but conftest.py is only ever imported by pytest against the
+# in-memory SQLite engine, never by the real (Postgres-backed) app.
+import json  # noqa: E402
+
+
+def _array_bind_processor(self, dialect):
+    def process(value):
+        return None if value is None else json.dumps(value)
+
+    return process
+
+
+def _array_result_processor(self, dialect, coltype):
+    def process(value):
+        return None if value is None else json.loads(value)
+
+    return process
+
+
+ARRAY.bind_processor = _array_bind_processor  # type: ignore[assignment]
+ARRAY.result_processor = _array_result_processor  # type: ignore[assignment]
+
+
 # Also patch the DDL compiler so ``Base.metadata.create_all`` succeeds.
 # The DDL compiler uses ``get_column_specification`` → ``type_compiler.process``.
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler  # noqa: E402

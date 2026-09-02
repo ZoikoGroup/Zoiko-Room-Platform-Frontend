@@ -10,7 +10,8 @@ from app.db.base import Base
 PROPERTY_TYPES = ("private_room",)
 
 LISTING_STATES = (
-    "DRAFT", "EVIDENCE_PENDING", "REVIEW", "REJECTED", "PUBLISHED", "PAUSED", "SUSPENDED", "WITHDRAWN", "ARCHIVED"
+    "DRAFT", "EVIDENCE_PENDING", "REVIEW", "REJECTED", "APPROVED",
+    "PUBLISHED", "PAUSED", "SUSPENDED", "WITHDRAWN", "ARCHIVED",
 )
 
 # Explicitly stored per listing rather than derived from country/market -- that

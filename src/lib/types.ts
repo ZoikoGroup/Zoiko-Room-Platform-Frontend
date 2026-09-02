@@ -7,6 +7,7 @@ export type ListingState =
   | "EVIDENCE_PENDING"
   | "REVIEW"
   | "REJECTED"
+  | "APPROVED"
   | "PUBLISHED"
   | "PAUSED"
   | "SUSPENDED"

@@ -161,12 +161,10 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
   }
 
   async function publishListing(id: string) {
+    // Publishing is the admin's own decision -- it does not re-check authority /
+    // occupancy / identity signals (those are informational, surfaced in the
+    // review modal, never a hard gate here).
     try {
-      const eligibility = await apiClientFetch<PublishEligibility>(`/api/listings/${id}/publish-eligibility`);
-      if (!eligibility.eligible) {
-        showToast(`Not eligible to publish: ${eligibility.reasons.join("; ")}`);
-        return;
-      }
       const updated = await apiClientFetch<Listing>(`/api/listings/${id}/publish`, { method: "POST" });
       setItems((prev) => prev.map((l) => (l.id === id ? updated : l)));
       showToast("Listing published");
@@ -209,6 +207,10 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
     if (!reviewListing) return;
     setReviewBusy(true);
     try {
+      // Two explicit steps -- REVIEW -> APPROVED -> PUBLISHED -- so the approval
+      // decision is recorded independently of publication (a later pause/republish
+      // never has to re-approve). One click for the reviewer, two real transitions.
+      await apiClientFetch<Listing>(`/api/listings/${reviewListing.id}/approve`, { method: "POST" });
       const updated = await apiClientFetch<Listing>(`/api/listings/${reviewListing.id}/publish`, { method: "POST" });
       setItems((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
       showToast(`"${updated.name}" approved and published`);
