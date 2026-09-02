@@ -68,6 +68,22 @@ def get_publish_eligibility(listing_id: str, db: Session = Depends(get_db)):
     return {"eligible": not reasons, "reasons": reasons}
 
 
+@router.post("/{listing_id}/approve", response_model=ListingRead)
+def approve_listing(
+    listing_id: str,
+    request: Request,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """REVIEW -> APPROVED. Any admin/super admin may do this for any listing --
+    review is an operational task, not scoped to "listings I personally own"."""
+    listing = _get_or_404(db, listing_id)
+    updated = crud.approve_listing(db, listing)
+    log_audit_event(db, admin, "listing.approve", "listing", listing_id, get_correlation_id(request))
+    db.commit()
+    return updated
+
+
 @router.post("/{listing_id}/publish", response_model=ListingRead)
 def publish_listing(
     listing_id: str,
@@ -75,8 +91,9 @@ def publish_listing(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    """Approve & publish. Any admin/super admin may do this for any listing --
-    review is an operational task, not scoped to "listings I personally own"."""
+    """Publish (from DRAFT, APPROVED, or PAUSED). Any admin/super admin may do
+    this for any listing -- review is an operational task, not scoped to
+    "listings I personally own"."""
     listing = _get_or_404(db, listing_id)
     updated = crud.publish_listing(db, listing)
     log_audit_event(db, admin, "listing.publish", "listing", listing_id, get_correlation_id(request))
@@ -109,8 +126,11 @@ def pause_listing(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    """Any admin/super admin may pause any listing -- same operational scope as
+    approve/publish/reject, not restricted to "listings I personally own"
+    (a USER-hosted listing has no owning admin at all, so that restriction would
+    make it un-pausable by a plain admin)."""
     listing = _get_or_404(db, listing_id)
-    _assert_owner_or_super_admin(listing, admin)
     updated = crud.set_listing_state(db, listing, "PAUSED")
     log_audit_event(db, admin, "listing.pause", "listing", listing_id, get_correlation_id(request))
     db.commit()
@@ -124,8 +144,8 @@ def withdraw_listing(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    """Same operational scope as pause -- see its docstring."""
     listing = _get_or_404(db, listing_id)
-    _assert_owner_or_super_admin(listing, admin)
     updated = crud.set_listing_state(db, listing, "WITHDRAWN")
     log_audit_event(db, admin, "listing.withdraw", "listing", listing_id, get_correlation_id(request))
     db.commit()

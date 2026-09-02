@@ -319,10 +319,29 @@ def submit_listing_for_review(db: Session, listing: Listing) -> Listing:
     return listing
 
 
+def approve_listing(db: Session, listing: Listing) -> Listing:
+    """Admin/super-admin only (enforced at the route level). REVIEW -> APPROVED.
+    The approval decision is recorded independently of publish_listing -- an
+    APPROVED listing that later gets paused stays approved, so re-publishing it
+    never has to re-run (or re-pass) any compliance check. No notification is
+    sent here; the USER-facing "approved and published" notification fires once,
+    from publish_listing, which is how the review UI's combined "Approve &
+    Publish" action actually reaches the user (see PropertiesManager.tsx)."""
+    if listing.state != "REVIEW":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Only a listing pending review can be approved")
+    listing.state = "APPROVED"
+    db.commit()
+    db.refresh(listing)
+    return listing
+
+
 def publish_listing(db: Session, listing: Listing) -> Listing:
     """Admin/super-admin only (enforced at the route level). check_publish_eligibility
     is informational -- it is deliberately NOT consulted here; the admin's decision
-    to approve is the final authority, not an automated compliance gate."""
+    to approve is the final authority, not an automated compliance gate. Works from
+    any non-published state that has a room (DRAFT for an admin's own quick-publish,
+    APPROVED for the normal review flow, PAUSED to resume a previously-approved
+    listing) -- none of these re-check authority/occupancy/identity."""
     if listing.room_id is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Listing must be linked to a room before it can be published")
     if listing.state == "PUBLISHED":
