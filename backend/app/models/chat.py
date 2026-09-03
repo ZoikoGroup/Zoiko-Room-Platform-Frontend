@@ -47,6 +47,7 @@ class ChatMessage(Base):
     content: Mapped[str] = mapped_column(Text, default="")
     tool_calls_json: Mapped[str] = mapped_column(Text, default="")
     tool_results_json: Mapped[str] = mapped_column(Text, default="")
+    meta_json: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     conversation: Mapped[ChatConversation] = relationship(back_populates="messages")
