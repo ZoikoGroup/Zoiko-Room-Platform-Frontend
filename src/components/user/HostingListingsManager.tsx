@@ -226,7 +226,7 @@ export function HostingListingsManager() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SectionHeading
           title="Your listings"
-          subtitle="Submit a listing for review when it's ready, then publish once a Zoiko admin approves it."
+          subtitle="Use “List a Room” to create a new listing. Submit it for review when it's ready, then it publishes once a Zoiko admin approves it."
         />
         <Button size="sm" onClick={() => setWizardOpen(true)}>
           <Plus className="h-4 w-4" /> List a Room
@@ -498,10 +498,14 @@ export function HostingListingsManager() {
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
         contact={{ name: user?.fullName ?? "", phone: user?.phone ?? "", email: user?.email ?? "" }}
-        onCreated={async () => {
+        onCreated={async (submitted) => {
           setWizardOpen(false);
           await load();
-          showToast("Draft listing created.");
+          showToast(
+            submitted
+              ? "Listing submitted for review — a Zoiko admin will approve or reject it."
+              : "Draft listing created."
+          );
         }}
       />
 

@@ -186,13 +186,6 @@ export default function UserRegisterPage() {
             </Link>
           </p>
         </div>
-
-        <p className="relative mt-6 text-center text-xs text-primary-300">
-          Zoiko staff?{" "}
-          <Link href="/register" className="font-semibold text-primary-100 hover:text-white">
-            Register as an admin instead
-          </Link>
-        </p>
       </div>
     </main>
   );

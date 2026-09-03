@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Building2, Check, ChevronLeft, ChevronRight, FileEdit, Send } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Switch } from "@/components/ui/Switch";
@@ -14,13 +15,15 @@ import {
   errorMessage,
   listHostedProperties,
   listHostedRooms,
+  submitHostedListingForReview,
 } from "@/lib/user-api";
 import { ImageGalleryUploader } from "@/components/admin/ImageGalleryUploader";
+import { formatCurrency } from "@/lib/utils";
 import { Field, inputClass } from "@/components/user/ui";
 
 const MAX_LISTING_IMAGES = 10;
 const SUPPORTED_CURRENCIES = ["INR", "GBP", "USD", "EUR", "CAD", "AUD", "AED", "SGD", "NZD"];
-const STEPS = ["Property", "Room", "Listing details"] as const;
+const STEPS = ["Property", "Room", "Listing", "Photos", "Review"] as const;
 
 type PropertyChoice = { mode: "existing"; propertyId: number } | { mode: "new"; address: string; city: string };
 type RoomChoice = { mode: "existing"; roomId: number } | { mode: "new"; size: string; hasEnsuite: boolean };
@@ -69,11 +72,13 @@ function splitList(value: string): string[] {
   return value.split(",").map((item) => item.trim()).filter(Boolean);
 }
 
-/** One "List a Room" workflow spanning property -> room -> listing details, so a
- *  host never has to separately visit "My Properties" and "My Listings" just to
- *  publish their first room. Existing standalone Property/Room management (and
- *  listing editing) are untouched -- this is an additional, friendlier entry
- *  point on top of the same backend endpoints, not a replacement. */
+/** One "List a Room" workflow spanning property -> room -> listing -> photos ->
+ *  review, so a host never has to separately visit "My Properties" and "My
+ *  Listings" just to publish their first room. Existing standalone Property/Room
+ *  management (and listing editing) are untouched -- this is an additional,
+ *  friendlier entry point on top of the same backend endpoints, not a
+ *  replacement. Review offers "Save as Draft" (create only, same as before) or
+ *  "Submit for Review" (create, then immediately ask an admin to review it). */
 export function ListARoomWizard({
   open,
   onClose,
@@ -82,7 +87,9 @@ export function ListARoomWizard({
 }: {
   open: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  /** submitted is true when the host chose "Submit for Review" on the Review
+   *  step, false when they chose "Save as Draft". */
+  onCreated: (submitted: boolean) => void;
   contact: { name: string; phone: string; email: string };
 }) {
   const [step, setStep] = useState(0);
@@ -144,6 +151,22 @@ export function ListARoomWizard({
         }
       }
     }
+    if (step === 2) {
+      if (!details.name.trim() || !details.location.trim()) {
+        setError("Give the listing a name and an area/neighbourhood.");
+        return;
+      }
+      const price = Number(details.pricePerNight);
+      if (!Number.isFinite(price) || price <= 0) {
+        setError("Enter a nightly price greater than zero.");
+        return;
+      }
+      const minStay = Number(details.minStayNights);
+      if (!Number.isFinite(minStay) || minStay < 30) {
+        setError("Zoiko is a long-stay marketplace — the minimum stay must be at least 30 nights.");
+        return;
+      }
+    }
     setStep((s) => Math.min(STEPS.length - 1, s + 1));
   }
 
@@ -152,19 +175,13 @@ export function ListARoomWizard({
     setStep((s) => Math.max(0, s - 1));
   }
 
-  async function handleFinish() {
-    if (!details.name.trim() || !details.location.trim()) {
-      setError("Give the listing a name and an area/neighbourhood.");
-      return;
-    }
+  async function handleFinish(submitForReview: boolean) {
     const price = Number(details.pricePerNight);
-    if (!Number.isFinite(price) || price <= 0) {
-      setError("Enter a nightly price greater than zero.");
-      return;
-    }
     const minStay = Number(details.minStayNights);
-    if (!Number.isFinite(minStay) || minStay < 30) {
-      setError("Zoiko is a long-stay marketplace — the minimum stay must be at least 30 nights.");
+    if (!details.name.trim() || !details.location.trim() || !Number.isFinite(price) || price <= 0 || !Number.isFinite(minStay) || minStay < 30) {
+      // Should already be caught by goNext's per-step validation -- this only
+      // guards against reaching Review some other way (e.g. browser back/forward).
+      setError("Some listing details are missing or invalid. Go back to the Listing step to fix them.");
       return;
     }
 
@@ -216,8 +233,11 @@ export function ListARoomWizard({
         contactPhone: details.contactPhone.trim(),
         contactEmail: details.contactEmail.trim(),
       };
-      await createHostedListing(payload);
-      onCreated();
+      const created = await createHostedListing(payload);
+      if (submitForReview) {
+        await submitHostedListingForReview(created.id);
+      }
+      onCreated(submitForReview);
     } catch (err) {
       setError(errorMessage(err, "Could not create the listing."));
     } finally {
@@ -226,7 +246,7 @@ export function ListARoomWizard({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="List a Room">
+    <Modal open={open} onClose={onClose} title="List a Room" size="xl">
       <div className="space-y-5">
         <div className="flex items-center gap-2">
           {STEPS.map((label, i) => (
@@ -496,15 +516,6 @@ export function ListARoomWizard({
                   />
                 </Field>
 
-                <Field label="Room photos" hint="Upload photos of the room. The first photo is used as the cover image.">
-                  <ImageGalleryUploader
-                    images={details.images}
-                    onChange={(images) => setDetails((d) => ({ ...d, images }))}
-                    uploadUrl="/api/users/hosting/uploads/images"
-                    maxImages={MAX_LISTING_IMAGES}
-                  />
-                </Field>
-
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <Field label="Contact name">
                     <input
@@ -530,6 +541,66 @@ export function ListARoomWizard({
                 </div>
               </div>
             )}
+
+            {step === 3 && (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Add photos of the room. The first photo is used as the cover image shown in search results.
+                </p>
+                <ImageGalleryUploader
+                  images={details.images}
+                  onChange={(images) => setDetails((d) => ({ ...d, images }))}
+                  uploadUrl="/api/users/hosting/uploads/images"
+                  maxImages={MAX_LISTING_IMAGES}
+                />
+              </div>
+            )}
+
+            {step === 4 && (
+              <div className="space-y-4">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Review your listing before saving. You can save it as a draft and come back later, or submit it
+                  for a Zoiko admin to review and publish.
+                </p>
+
+                <div className="overflow-hidden rounded-xl ring-1 ring-slate-100 dark:ring-white/10">
+                  {details.images[0] ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={details.images[0]} alt={details.name} className="h-40 w-full object-cover" />
+                  ) : (
+                    <div className="flex h-24 w-full items-center justify-center bg-slate-50 text-xs text-slate-400 dark:bg-slate-800">
+                      No photos added
+                    </div>
+                  )}
+                  <div className="space-y-2 bg-slate-50 p-4 dark:bg-slate-800/60">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-heading text-sm font-bold text-primary-900 dark:text-white">
+                        {details.name || "Untitled listing"}
+                      </p>
+                      <Badge tone="neutral">{details.roomType}</Badge>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {details.location || "No area set"}
+                      {propertyChoice.mode === "existing"
+                        ? ` — ${properties.find((p) => p.id === propertyChoice.propertyId)?.address ?? ""}`
+                        : propertyChoice.address
+                          ? ` — ${propertyChoice.address}, ${propertyChoice.city}`
+                          : ""}
+                    </p>
+                    <p className="text-sm font-semibold text-primary-900 dark:text-white">
+                      {details.pricePerNight ? formatCurrency(Number(details.pricePerNight) || 0, details.currency) : "—"}
+                      <span className="text-xs font-normal text-slate-400"> / night · min. {details.minStayNights} nights</span>
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {details.guests} guest{details.guests === "1" ? "" : "s"} · {details.bedrooms} bedroom
+                      {details.bedrooms === "1" ? "" : "s"} · {details.bathrooms} bathroom{details.bathrooms === "1" ? "" : "s"}
+                      {Number(details.size) > 0 ? ` · ${details.size} sq ft` : ""} · {details.images.length} photo
+                      {details.images.length === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -552,9 +623,14 @@ export function ListARoomWizard({
               Next <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button type="button" onClick={handleFinish} loading={submitting}>
-              Create listing
-            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => handleFinish(false)} loading={submitting}>
+                <FileEdit className="h-4 w-4" /> Save as Draft
+              </Button>
+              <Button type="button" onClick={() => handleFinish(true)} loading={submitting}>
+                <Send className="h-4 w-4" /> Submit for Review
+              </Button>
+            </div>
           )}
         </div>
       </div>
