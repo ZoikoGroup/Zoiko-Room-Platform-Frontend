@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarClock, Repeat } from "lucide-react";
+import { AlertTriangle, CalendarClock, Repeat } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Loader } from "@/components/ui/Loader";
@@ -12,19 +12,53 @@ import { formatDate } from "@/lib/utils";
 import { errorMessage, listSubletRequests } from "@/lib/user-api";
 import { Card, EmptyState, Toast, useToast } from "@/components/user/ui";
 
+type StatusFilter = "all" | keyof typeof subletRequestStatusLabel;
+
+const STATUS_FILTERS: StatusFilter[] = ["all", "pending_verification", "pending_admin_review", "approved", "rejected"];
+
 export function SubletRequestsList() {
   const { toast, showToast } = useToast();
   const [requests, setRequests] = useState<SubletRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
-  useEffect(() => {
+  function load() {
+    setLoading(true);
+    setLoadError("");
     listSubletRequests()
       .then(setRequests)
-      .catch((err) => showToast(errorMessage(err, "Could not load your sublet requests."), "error"))
+      .catch((err) => {
+        const message = errorMessage(err, "Could not load your sublet requests.");
+        setLoadError(message);
+        showToast(message, "error");
+      })
       .finally(() => setLoading(false));
-  }, [showToast]);
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(load, []);
+
+  const filtered = useMemo(
+    () => (statusFilter === "all" ? requests : requests.filter((r) => r.status === statusFilter)),
+    [requests, statusFilter]
+  );
 
   if (loading) return <Loader label="Loading your sublet requests" />;
+
+  if (loadError) {
+    return (
+      <Card>
+        <div className="flex flex-col items-center gap-3 py-8 text-center">
+          <AlertTriangle className="h-6 w-6 text-accent-600" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">{loadError}</p>
+          <Button size="sm" variant="outline" onClick={load}>
+            Retry
+          </Button>
+        </div>
+      </Card>
+    );
+  }
 
   if (requests.length === 0) {
     return (
@@ -46,7 +80,29 @@ export function SubletRequestsList() {
 
   return (
     <div className="space-y-3">
-      {requests.map((request) => (
+      <div className="flex flex-wrap gap-2">
+        {STATUS_FILTERS.map((s) => (
+          <button
+            key={s}
+            onClick={() => setStatusFilter(s)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              statusFilter === s
+                ? "bg-primary-700 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            }`}
+          >
+            {s === "all" ? "All" : subletRequestStatusLabel[s]}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <Card>
+          <EmptyState message="No sublet requests match this filter." />
+        </Card>
+      )}
+
+      {filtered.map((request) => (
         <Card key={request.id} className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="font-heading text-sm font-bold text-primary-900 dark:text-white">

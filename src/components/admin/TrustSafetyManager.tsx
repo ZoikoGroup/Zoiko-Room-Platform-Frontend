@@ -244,14 +244,16 @@ export function TrustSafetyManager() {
           does not automatically block publishing a listing.
         </p>
         <div className="mt-4 space-y-2">
-          {authorityRecords.map((record) => (
+          {authorityRecords.map((record) => {
+            const room = rooms.find((r) => r.id === record.roomId);
+            return (
             <div
               key={record.id}
               className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-100 dark:bg-slate-800 dark:ring-white/10"
             >
               <div>
                 <p className="text-sm font-semibold text-primary-900 dark:text-white">
-                  Room #{record.roomId} — {record.authorityType}
+                  {room ? room.property.address : `Room #${record.roomId}`} — {record.authorityType}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Evidence: {record.evidenceRef || "—"}
@@ -272,7 +274,8 @@ export function TrustSafetyManager() {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
           {authorityRecords.length === 0 && (
             <p className="text-sm text-slate-400 dark:text-slate-400">No authority records submitted yet.</p>
           )}

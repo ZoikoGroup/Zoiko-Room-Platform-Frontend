@@ -14,7 +14,7 @@ import {
   ThumbsUp,
   XCircle,
 } from "lucide-react";
-import { AdminRole, Application, Listing, PublishEligibility } from "@/lib/types";
+import { AdminRole, AdminUserSummary, Application, Listing, PublishEligibility } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -39,6 +39,8 @@ function applicationDisplay(application: Application): { label: string; tone: "w
 export function LeasingManager() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [publishedListings, setPublishedListings] = useState<Listing[]>([]);
+  const [listingsById, setListingsById] = useState<Record<string, Listing>>({});
+  const [ownerNamesById, setOwnerNamesById] = useState<Record<number, string>>({});
   const [role, setRole] = useState<AdminRole | null>(null);
   const [toast, setToast] = useState("");
   const [termsOfferId, setTermsOfferId] = useState<number | null>(null);
@@ -64,6 +66,18 @@ export function LeasingManager() {
       ]);
       setApplications(applicationsData);
       setPublishedListings(listingsData.filter((l) => l.state === "PUBLISHED"));
+      setListingsById(Object.fromEntries(listingsData.map((l) => [l.id, l])));
+
+      // Owner/host names -- /api/admin-users is super_admin-only, so a regular
+      // admin falls back to "Owner #<id>" below rather than erroring on this fetch.
+      if (admin?.role === "super_admin") {
+        try {
+          const owners = await apiClientFetch<AdminUserSummary[]>("/api/admin-users");
+          setOwnerNamesById(Object.fromEntries(owners.map((o) => [o.id, o.fullName])));
+        } catch {
+          // Non-fatal -- host names just won't resolve.
+        }
+      }
     } catch {
       showToast("Failed to load applications");
     }
@@ -325,6 +339,8 @@ export function LeasingManager() {
         const latestTerms = offer?.terms[offer.terms.length - 1];
         const display = applicationDisplay(application);
         const isPending = application.status === "SUBMITTED" && !latestDecision;
+        const listing = listingsById[application.listingId];
+        const hostName = listing ? ownerNamesById[listing.ownerId] : undefined;
 
         return (
           <div
@@ -341,6 +357,12 @@ export function LeasingManager() {
                   Application #{application.id} · {application.listingId} · {application.guestEmail} · applied{" "}
                   {formatDate(application.submittedAt)}
                 </p>
+                {listing && (
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {listing.location}, {listing.city}
+                    {hostName ? ` · Hosted by ${hostName}` : ""}
+                  </p>
+                )}
               </div>
               <Badge tone={display.tone}>{display.label}</Badge>
             </div>

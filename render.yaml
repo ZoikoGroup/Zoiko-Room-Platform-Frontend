@@ -1,0 +1,76 @@
+services:
+  - type: web
+    name: zoiko-rooms-api
+    env: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt && alembic upgrade head"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: DATABASE_URL
+        fromDatabase:
+          name: zoiko-rooms-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRE_MINUTES
+        value: "1440"
+      # Set to the deployed Vercel frontend URL(s), comma-separated if more than one.
+      - key: CORS_ORIGINS
+        sync: false
+      - key: COOKIE_SECURE
+        value: "true"
+      # Leave unset for now (default *.onrender.com/*.vercel.app URLs need a host-only
+      # cookie). Set to ".zoikorooms.com" only once both services sit under that domain.
+      - key: COOKIE_DOMAIN
+        sync: false
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      # Set to this service's own public Render URL (used to build absolute image URLs).
+      - key: PUBLIC_API_URL
+        sync: false
+      - key: UPLOAD_DIR
+        value: uploads
+      - key: MAX_UPLOAD_SIZE_MB
+        value: "8"
+      - key: IDENTITY_UPLOAD_DIR
+        value: secure_uploads/identity
+      - key: IDENTITY_DOCUMENT_MAX_SIZE_MB
+        value: "10"
+      # Set to the deployed Vercel frontend URL (used in password-reset email links).
+      - key: FRONTEND_URL
+        sync: false
+      - key: PASSWORD_RESET_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      # "file" writes mail to a local outbox instead of sending -- fine to start,
+      # switch to "smtp" and fill in SMTP_* below once real email is needed.
+      - key: EMAIL_PROVIDER
+        value: file
+      - key: EMAIL_FROM
+        value: "Zoiko Rooms <no-reply@zoikorooms.com>"
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_USE_TLS
+        value: "true"
+
+databases:
+  - name: zoiko-rooms-db
+    plan: free
+    region: oregon
