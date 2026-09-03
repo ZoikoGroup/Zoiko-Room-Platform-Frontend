@@ -181,13 +181,6 @@ export default function AdminLoginPage() {
             </Button>
           </form>
 
-          <p className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
-            New here?{" "}
-            <Link href="/register" className="font-semibold text-primary-700 hover:text-accent-600 dark:text-primary-300">
-              Register as an admin
-            </Link>
-          </p>
-
           <div className="mt-6 flex items-center justify-center gap-2 border-t border-slate-100 pt-5 dark:border-slate-800">
             {perks.map((perk, i) => {
               const Icon = perk.icon;

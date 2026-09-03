@@ -71,3 +71,20 @@ def get_current_user(
             raise unauthorized
     return user
 
+
+def get_current_user_optional(
+    zoiko_user_token: str | None = Cookie(default=None, alias=USER_COOKIE_NAME),
+    db: Session = Depends(get_db),
+) -> UserAccount | None:
+    """Same identity resolution as get_current_user, but returns None instead of
+    raising when there's no/invalid session. For endpoints that must stay reachable
+    without a USER session (e.g. the public listings API, which a separate
+    unauthenticated renter-facing site also calls) but should still adapt their
+    behavior when a USER session happens to be present."""
+    if not zoiko_user_token:
+        return None
+    try:
+        return get_current_user(zoiko_user_token, db)
+    except HTTPException:
+        return None
+

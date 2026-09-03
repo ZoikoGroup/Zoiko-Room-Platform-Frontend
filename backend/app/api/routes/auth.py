@@ -4,10 +4,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import COOKIE_NAME, get_current_admin
 from app.core.config import settings
 from app.core.security import create_access_token, verify_password
-from app.crud.admin import authenticate, get_admin_by_email, register_admin, update_password
+from app.crud.admin import authenticate, update_password
 from app.db.session import get_db
 from app.models.admin_user import AdminUser
-from app.schemas.auth import AdminRead, LoginRequest, PasswordChangeRequest, RegisterRequest, RegisterResponse
+from app.schemas.auth import AdminRead, LoginRequest, PasswordChangeRequest
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -26,12 +26,9 @@ def _set_auth_cookie(response: Response, email: str) -> None:
     )
 
 
-@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    if get_admin_by_email(db, payload.email):
-        raise HTTPException(status.HTTP_409_CONFLICT, "An account with this email already exists")
-    register_admin(db, payload.email, payload.password, payload.full_name, payload.phone)
-    return RegisterResponse(message="Registration submitted. A super admin will review and approve your account.")
+# Deliberately no public POST /register here -- Admin accounts are provisioned
+# only by a super admin via POST /api/admin-users (see admin_users.py), never
+# through public self-registration.
 
 
 @router.post("/login", response_model=AdminRead)
