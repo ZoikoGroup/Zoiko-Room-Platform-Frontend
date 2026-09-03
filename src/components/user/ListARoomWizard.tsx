@@ -141,6 +141,18 @@ export function ListARoomWizard({
         setError("Enter an address and city, or pick an existing property.");
         return;
       }
+      // Reduce duplicate entry: default the listing's area/neighbourhood from the
+      // property's own address instead of making the host retype it. Only fills
+      // in an empty field -- never overwrites something they've already typed.
+      if (!details.location.trim()) {
+        const defaultLocation =
+          propertyChoice.mode === "existing"
+            ? properties.find((p) => p.id === propertyChoice.propertyId)?.address ?? ""
+            : propertyChoice.address;
+        if (defaultLocation) {
+          setDetails((d) => ({ ...d, location: defaultLocation }));
+        }
+      }
     }
     if (step === 1) {
       if (roomChoice.mode === "new") {

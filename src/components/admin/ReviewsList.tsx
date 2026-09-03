@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MessageSquareReply, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { Review } from "@/lib/types";
 import { StarRating } from "@/components/ui/StarRating";
 import { formatDate } from "@/lib/utils";
@@ -65,9 +65,6 @@ export function ReviewsList({ reviews }: { reviews: Review[] }) {
                 <StarRating rating={r.rating} size={13} />
               </div>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{r.comment}</p>
-              <button className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-primary-700 hover:text-accent-600 dark:text-primary-300">
-                <MessageSquareReply className="h-3.5 w-3.5" /> Reply
-              </button>
             </div>
           </div>
         ))}
