@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 1440
     cors_origins: str = "http://localhost:3000"
     cookie_secure: bool = False
+    # None scopes the cookie to the exact request host (required for localhost).
+    # Set to ".zoikorooms.com" in production so the cookie is shared across subdomains.
+    cookie_domain: str | None = None
 
     seed_admin_email: str = "admin@zoikorooms.com"
     seed_admin_password: str = "change-this-password"

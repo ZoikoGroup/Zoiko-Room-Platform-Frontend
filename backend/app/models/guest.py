@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import Date, Index, String, UniqueConstraint
+from sqlalchemy import Date, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -25,6 +25,17 @@ class Guest(Base):
     location: Mapped[str] = mapped_column(String(255), default="")
     joined_at: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active")
+    # The real link to the self-service UserAccount this Guest represents, if
+    # any -- replaces matching by `Guest.email == UserAccount.email` (fragile:
+    # breaks silently if either email is later changed) as the source of truth
+    # everywhere a "current user's guest record" is resolved. Nullable because
+    # a Guest created through the legacy admin-only Booking flow (a walk-in
+    # tenant with no self-service account) has nothing to link to. Unique so
+    # one UserAccount maps to at most one Guest.
+    user_account_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("user_accounts.id", ondelete="SET NULL"), unique=True, nullable=True
+    )
 
     bookings: Mapped[list["Booking"]] = relationship(back_populates="guest")
     reviews: Mapped[list["Review"]] = relationship(back_populates="guest")
+    user_account: Mapped["UserAccount"] = relationship()

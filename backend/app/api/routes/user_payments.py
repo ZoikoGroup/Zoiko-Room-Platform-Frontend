@@ -3,13 +3,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
+from app.crud.finance import annotate_payment_context
+from app.crud.guest import get_guest_for_user
 from app.db.session import get_db
 from app.models.finance import SimulatedPayment
-from app.models.guest import Guest
 from app.models.user_account import UserAccount
-from app.schemas.finance import PaymentAllocationRead, SimulatedPaymentRead
+from app.schemas.finance import SimulatedPaymentRead
 
-router = APIRouter(prefix="/api/users/payments", tags=["user-payments"])
+router = APIRouter(prefix="/api/users/payments", tags=["user-payments"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("", response_model=list[SimulatedPaymentRead])
@@ -18,7 +19,7 @@ def list_user_payment_history(
     db: Session = Depends(get_db),
 ):
     """Read-only payment history limited to the authenticated user's guest record."""
-    guest = db.scalar(select(Guest).where(Guest.email == user.email))
+    guest = get_guest_for_user(db, user)
     if not guest:
         return []
 
@@ -30,26 +31,4 @@ def list_user_payment_history(
             .order_by(SimulatedPayment.created_at.desc())
         )
     )
-    return [
-        SimulatedPaymentRead(
-            id=payment.id,
-            guest_id=payment.guest_id,
-            amount=payment.amount,
-            currency=payment.currency,
-            idempotency_key=payment.idempotency_key,
-            status=payment.status,
-            created_at=payment.created_at,
-            confirmed_at=payment.confirmed_at,
-            allocations=[
-                PaymentAllocationRead(
-                    id=allocation.id,
-                    payment_id=allocation.payment_id,
-                    obligation_id=allocation.obligation_id,
-                    amount_allocated=allocation.amount_allocated,
-                    created_at=allocation.created_at,
-                )
-                for allocation in payment.allocations
-            ],
-        )
-        for payment in payments
-    ]
+    return [SimulatedPaymentRead.model_validate(annotate_payment_context(p)) for p in payments]

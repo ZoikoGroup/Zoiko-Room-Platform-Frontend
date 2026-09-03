@@ -137,10 +137,8 @@ def _admin_tool_occupancy_by_city(db: Session, _admin: AdminUser, _args: dict) -
 
 
 def _resolve_user_guest(db: Session, user: UserAccount):
-    """Return the Guest record linked to this user's email, or None."""
-    from app.models.guest import Guest
-
-    return db.scalar(select(Guest).where(Guest.email == user.email))
+    """Return the Guest record linked to this user, or None."""
+    return crud_guest.get_guest_for_user(db, user)
 
 
 def _user_tool_search_listings(db: Session, user: UserAccount, args: dict) -> list[dict]:
