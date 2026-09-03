@@ -119,7 +119,7 @@ export function HostingPropertiesManager() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SectionHeading
           title="Your properties"
-          subtitle="List a room in a few steps, or manage your properties and rooms individually below."
+          subtitle="Use “List a Room” to add a room in one flow. The properties and rooms below are for editing what you already have."
         />
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => setPropertyForm({ id: null, address: "", city: "" })}>
@@ -329,10 +329,14 @@ export function HostingPropertiesManager() {
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
         contact={{ name: user?.fullName ?? "", phone: user?.phone ?? "", email: user?.email ?? "" }}
-        onCreated={async () => {
+        onCreated={async (submitted) => {
           setWizardOpen(false);
           await load();
-          showToast("Draft listing created — find it under My Listings when you're ready to submit it for review.");
+          showToast(
+            submitted
+              ? "Listing submitted for review — a Zoiko admin will approve or reject it."
+              : "Draft listing created — find it under My Listings when you're ready to submit it for review."
+          );
         }}
       />
 

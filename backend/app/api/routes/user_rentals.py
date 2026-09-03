@@ -10,6 +10,7 @@ from app.crud import leasing as leasing_crud
 from app.crud import occupancy as occupancy_crud
 from app.crud import review as review_crud
 from app.crud import sublet as sublet_crud
+from app.crud.listing import assert_party_does_not_own_listing
 from app.crud.audit import log_audit_event
 from app.crud.events import emit_event
 from app.crud.eligibility import check_offer_eligibility
@@ -96,6 +97,12 @@ def submit_rental_application(
             status.HTTP_403_FORBIDDEN,
             "You must complete identity verification before submitting applications",
         )
+
+    # A host cannot apply to their own listing -- enforced here regardless of
+    # what the frontend shows, so it can't be bypassed by calling the API directly.
+    listing = db.get(Listing, payload.listing_id)
+    if listing and user.party_id:
+        assert_party_does_not_own_listing(listing, user.party_id)
 
     # Get or create guest for this user
     guest = get_or_create_guest_for_user(db, user)

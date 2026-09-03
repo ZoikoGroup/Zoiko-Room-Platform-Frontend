@@ -16,13 +16,6 @@ export function login(email: string, password: string): Promise<AdminProfile> {
   });
 }
 
-export function register(fullName: string, email: string, phone: string, password: string): Promise<{ message: string }> {
-  return apiClientFetch<{ message: string }>("/api/auth/register", {
-    method: "POST",
-    body: JSON.stringify({ fullName, email, phone, password }),
-  });
-}
-
 export async function logout(): Promise<void> {
   await apiClientFetch("/api/auth/logout", { method: "POST" });
 }

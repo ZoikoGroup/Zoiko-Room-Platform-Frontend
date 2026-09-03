@@ -29,24 +29,6 @@ def create_admin(db: Session, email: str, password: str, full_name: str = "Zoiko
     return admin
 
 
-def register_admin(db: Session, email: str, password: str, full_name: str, phone: str) -> AdminUser:
-    # Self-registration always creates a plain "admin", pending super admin approval --
-    # never super_admin, and never immediately able to log in.
-    admin = AdminUser(
-        email=email,
-        hashed_password=hash_password(password),
-        full_name=full_name,
-        phone=phone,
-        role="admin",
-        approval_status="pending",
-    )
-    admin.settings = AdminSettings()
-    db.add(admin)
-    db.commit()
-    db.refresh(admin)
-    return admin
-
-
 def update_password(db: Session, admin: AdminUser, new_password: str) -> None:
     admin.hashed_password = hash_password(new_password)
     db.commit()

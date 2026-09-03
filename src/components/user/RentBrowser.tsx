@@ -10,6 +10,7 @@ import { PublicListing } from "@/lib/types";
 import { formatCurrency, resolveImageUrl } from "@/lib/utils";
 import { errorMessage, listPublicListings, listRentalApplications } from "@/lib/user-api";
 import { ApplyForRoomModal } from "@/components/user/ApplyForRoomModal";
+import { ListingDetailModal } from "@/components/user/ListingDetailModal";
 import { IdentityGate } from "@/components/user/IdentityGate";
 import { useUserSession } from "@/components/user/UserSessionContext";
 import { Card, EmptyState, Field, Toast, inputClass, useToast } from "@/components/user/ui";
@@ -42,6 +43,7 @@ export function RentBrowser() {
   const [loadError, setLoadError] = useState("");
 
   const [selected, setSelected] = useState<PublicListing | null>(null);
+  const [detailListingId, setDetailListingId] = useState<string | null>(null);
 
   // Applications only need to be read once -- they don't depend on the filters/page.
   useEffect(() => {
@@ -202,7 +204,12 @@ export function RentBrowser() {
                   key={listing.id}
                   className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg dark:bg-slate-900 dark:ring-white/10"
                 >
-                  <Link href={`/account/rent/${listing.id}`} className="block">
+                  <button
+                    type="button"
+                    onClick={() => setDetailListingId(listing.id)}
+                    className="block w-full text-left"
+                    aria-label={`View details for ${listing.name}`}
+                  >
                     {listing.images[0] ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={resolveImageUrl(listing.images[0])} alt={listing.name} className="h-44 w-full object-cover" />
@@ -211,13 +218,17 @@ export function RentBrowser() {
                         <BedDouble className="h-8 w-8 text-primary-300" />
                       </div>
                     )}
-                  </Link>
+                  </button>
 
                   <div className="flex flex-1 flex-col p-4">
-                    <Link href={`/account/rent/${listing.id}`} className="flex items-start justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDetailListingId(listing.id)}
+                      className="flex items-start justify-between gap-2 text-left"
+                    >
                       <p className="font-heading text-sm font-bold text-primary-900 dark:text-white hover:underline">{listing.name}</p>
                       <Badge tone="primary">{listing.roomType}</Badge>
-                    </Link>
+                    </button>
 
                     <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                       <MapPin className="h-3.5 w-3.5" /> {listing.location}, {listing.city}
@@ -283,6 +294,7 @@ export function RentBrowser() {
       )}
 
       <ApplyForRoomModal listing={selected} onClose={() => setSelected(null)} onApplied={handleApplied} />
+      <ListingDetailModal listingId={detailListingId} onClose={() => setDetailListingId(null)} onApplied={handleApplied} />
 
       <p className="text-center text-xs text-slate-400">
         Already applied somewhere?{" "}

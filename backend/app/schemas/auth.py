@@ -6,17 +6,6 @@ class LoginRequest(CamelModel):
     password: str
 
 
-class RegisterRequest(CamelModel):
-    email: str
-    password: str
-    full_name: str
-    phone: str = ""
-
-
-class RegisterResponse(CamelModel):
-    message: str
-
-
 class AdminRead(CamelModel):
     id: int
     email: str

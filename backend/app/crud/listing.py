@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.mailer import send_listing_published_email, send_listing_rejected_email
@@ -129,13 +129,19 @@ def list_public_listings(
     amenities: list[str] | None = None,
     limit: int = 20,
     offset: int = 0,
+    exclude_party_id: int | None = None,
 ) -> tuple[list[Listing], int]:
     """Server-side filtered, paginated public listing search. Only ever returns
     PUBLISHED listings -- unpublished/withdrawn/draft/etc. states are never
     reachable through this path regardless of what filters are supplied.
     Also excludes listings whose room is currently occupied (active occupancy)
     or inactive -- state=PUBLISHED alone doesn't mean a renter hasn't since
-    moved in, and search results must never show an occupied room as bookable."""
+    moved in, and search results must never show an occupied room as bookable.
+
+    exclude_party_id: when the caller is an authenticated USER, their own
+    party's listings are left out of their own search results -- a host should
+    never see (or be able to apply to) a room they list themselves. Admin-owned
+    listings (party_id is NULL) are never affected by this."""
     occupied_room_ids = _occupied_room_ids(db)
     conditions = [Listing.state == "PUBLISHED"]
     if occupied_room_ids:
@@ -158,6 +164,8 @@ def list_public_listings(
         # Postgres array-containment (@>): the listing's amenities must be a
         # superset of every amenity requested.
         conditions.append(Listing.amenities.contains(amenities))
+    if exclude_party_id is not None:
+        conditions.append(or_(Listing.party_id.is_(None), Listing.party_id != exclude_party_id))
 
     total = db.scalar(select(func.count()).select_from(Listing).where(*conditions)) or 0
 
@@ -259,6 +267,13 @@ def create_listing_for_party(db: Session, data: ListingCreate, party_id: int) ->
 def assert_party_owns_listing(listing: Listing, party_id: int) -> None:
     if listing.party_id != party_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only manage listings owned by your party")
+
+
+def assert_party_does_not_own_listing(listing: Listing, party_id: int) -> None:
+    """The inverse of assert_party_owns_listing -- a renter can apply to any
+    listing except one their own party hosts."""
+    if listing.party_id is not None and listing.party_id == party_id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You cannot apply to your own listing")
 
 
 def assert_party_owns_room(db: Session, room_id: int, party_id: int) -> None:
