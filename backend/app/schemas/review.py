@@ -13,3 +13,9 @@ class ReviewRead(CamelModel):
     comment: str
     date: date
     property_type: str
+
+
+class ReviewCreate(CamelModel):
+    listing_id: str
+    rating: int
+    comment: str = ""

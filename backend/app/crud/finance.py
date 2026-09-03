@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.crud.authority import get_valid_authority_for_room
+from app.crud import notification as notif_crud
 from app.crud.occupancy import generate_next_rent_obligation
 from app.crud.party import assert_provider_access, get_or_create_default_party
 from app.models.admin_user import AdminUser
@@ -121,11 +122,33 @@ def list_obligations(
     return list(db.scalars(query))
 
 
+def annotate_payment_context(payment: SimulatedPayment) -> SimulatedPayment:
+    """Sets transient (non-persisted) display attributes so SimulatedPaymentRead
+    can show property/room/tenant context instead of a bare status flag --
+    derived from the occupancy behind the payment's allocations, which is the
+    only place that chain of relationships actually exists."""
+    payment.guest_name = payment.guest.name if payment.guest else ""
+    payment.listing_id = None
+    payment.listing_name = ""
+    payment.room_id = None
+    payment.property_address = ""
+    for allocation in payment.allocations:
+        allocation.obligation_type = allocation.obligation.obligation_type if allocation.obligation else ""
+        occupancy = allocation.obligation.occupancy if allocation.obligation else None
+        if occupancy and payment.listing_id is None:
+            payment.listing_id = occupancy.listing_id
+            payment.listing_name = occupancy.listing.name if occupancy.listing else ""
+            payment.room_id = occupancy.room_id
+            if occupancy.room and occupancy.room.property:
+                payment.property_address = occupancy.room.property.address
+    return payment
+
+
 def list_payments(db: Session, admin: AdminUser) -> list[SimulatedPayment]:
     query = select(SimulatedPayment).order_by(SimulatedPayment.created_at.desc())
     if admin.role != "super_admin":
         query = query.where(SimulatedPayment.id.in_(_owned_payment_ids(db, admin)))
-    return list(db.scalars(query))
+    return [annotate_payment_context(p) for p in db.scalars(query)]
 
 
 def get_payment_or_404(db: Session, payment_id: int) -> SimulatedPayment:
@@ -184,6 +207,13 @@ def confirm_payment(db: Session, payment: SimulatedPayment, data: PaymentConfirm
 
     payment.status = "SUCCEEDED"
     payment.confirmed_at = datetime.now(timezone.utc)
+    notif_crud.notify_user_by_guest(
+        db, payment.guest,
+        title="Payment received",
+        message=f"Your payment of {payment.currency} {payment.amount:.2f} has been confirmed.",
+        notification_type="payment.confirmed",
+        related_entity_type="simulated_payment", related_entity_id=str(payment.id),
+    )
     db.commit()
 
     # Auto-generate the next recurring rent obligation once a period's rent clears --

@@ -1,9 +1,53 @@
+from datetime import date
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from app.crud.ids import dicebear_avatar, new_id
 from app.models.booking import Booking
 from app.models.guest import Guest
+from app.models.user_account import UserAccount
 from app.schemas.guest import GuestRead
+
+
+def get_guest_for_user(db: Session, user: UserAccount) -> Guest | None:
+    """The single source of truth for "which Guest record is this user's
+    rental identity" -- looks up by the real user_account_id FK first. Falls
+    back to an email match (and opportunistically backfills the FK when it
+    finds one) only for a Guest row that predates the link or was created
+    without it, so nothing already-matched silently becomes unreachable."""
+    guest = db.scalar(select(Guest).where(Guest.user_account_id == user.id))
+    if guest:
+        return guest
+
+    guest = db.scalar(select(Guest).where(Guest.email == user.email, Guest.user_account_id.is_(None)))
+    if guest:
+        guest.user_account_id = user.id
+        db.flush()
+    return guest
+
+
+def get_or_create_guest_for_user(db: Session, user: UserAccount) -> Guest:
+    """Get the Guest linked to this user, creating one (with the FK set from
+    the start) if this is their first rental-lifecycle action."""
+    guest = get_guest_for_user(db, user)
+    if guest:
+        return guest
+
+    guest = Guest(
+        id=new_id("G"),
+        name=user.full_name,
+        email=user.email,
+        phone=user.phone,
+        avatar=dicebear_avatar(user.full_name),
+        location="",
+        joined_at=date.today(),
+        status="active",
+        user_account_id=user.id,
+    )
+    db.add(guest)
+    db.flush()
+    return guest
 
 
 def list_guests(db: Session) -> list[GuestRead]:

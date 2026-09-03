@@ -15,7 +15,7 @@ from app.models.user_account import UserAccount
 from app.schemas.marketplace import PropertyCreate, PropertyRead, RoomCreate, RoomRead
 from app.schemas.listing import ListingCreate, ListingRead, ListingUpdate
 
-router = APIRouter(prefix="/api/users/hosting", tags=["user-hosting"])
+router = APIRouter(prefix="/api/users/hosting", tags=["user-hosting"], dependencies=[Depends(get_current_user)])
 
 
 @router.post("/uploads/images")
@@ -206,7 +206,7 @@ def list_user_listings(
             select(Listing).where(Listing.party_id == user.party_id).order_by(Listing.id.desc())
         )
     )
-    return listings
+    return listing_crud.annotate_availability(db, listings)
 
 
 @router.post("/listings", response_model=ListingRead, status_code=status.HTTP_201_CREATED)

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_admin, require_super_admin
 from app.core.correlation import get_correlation_id
 from app.crud import finance as crud
+from app.crud.finance import annotate_payment_context
 from app.crud.audit import log_audit_event
 from app.crud.events import emit_event
 from app.db.session import get_db
@@ -47,7 +48,7 @@ def get_payments(admin: AdminUser = Depends(get_current_admin), db: Session = De
 
 @router.post("/payments", response_model=SimulatedPaymentRead, status_code=status.HTTP_201_CREATED)
 def post_create_payment(payload: SimulatedPaymentCreate, db: Session = Depends(get_db)):
-    return crud.create_payment_intent(db, payload)
+    return annotate_payment_context(crud.create_payment_intent(db, payload))
 
 
 @router.post("/payments/{payment_id}/confirm", response_model=SimulatedPaymentRead)
@@ -70,7 +71,7 @@ def post_confirm_payment(
             {"amount": float(updated.amount), "currency": updated.currency},
         )
         db.commit()
-    return updated
+    return annotate_payment_context(updated)
 
 
 @router.get("/deposits", response_model=list[DepositRecordRead])

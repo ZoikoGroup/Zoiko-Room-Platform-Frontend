@@ -1,4 +1,3 @@
-from datetime import date as date_
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -9,22 +8,35 @@ from app.api.deps import get_current_user
 from app.core.correlation import get_correlation_id
 from app.crud import leasing as leasing_crud
 from app.crud import occupancy as occupancy_crud
+from app.crud import review as review_crud
 from app.crud import sublet as sublet_crud
 from app.crud.audit import log_audit_event
 from app.crud.events import emit_event
 from app.crud.eligibility import check_offer_eligibility
+from app.crud.guest import get_guest_for_user, get_or_create_guest_for_user
 from app.crud.identity_verification import get_verified_identity_for_party
-from app.crud.ids import dicebear_avatar, new_id
 from app.crud import notification as notif_crud
+from app.crud.user import get_user_by_party_id
 from app.db.session import get_db
-from app.models.guest import Guest
 from app.models.leasing import Application
 from app.models.listing import Listing
 from app.models.occupancy import Occupancy
 from app.models.user_account import UserAccount
 from app.schemas.leasing import UserApplicationRead, UserApplicationSubmitRequest, UserOccupancyRead, SubletRequestCreate, SubletRequestRead
+from app.schemas.review import ReviewCreate, ReviewRead
 
-router = APIRouter(prefix="/api/users/rentals", tags=["user-rentals"])
+router = APIRouter(prefix="/api/users/rentals", tags=["user-rentals"], dependencies=[Depends(get_current_user)])
+
+
+def _property_and_host(db: Session, listing: Listing | None) -> tuple[str, str, str]:
+    """Resolves (property_address, property_city, host_name) for a listing's
+    room/property so renter-facing screens can show where they're
+    applying/living and who the host is, without exposing internal party ids."""
+    if listing is None or listing.room is None or listing.room.property is None:
+        return "", "", ""
+    property_ = listing.room.property
+    host = get_user_by_party_id(db, property_.owner_party_id)
+    return property_.address, property_.city, host.full_name if host else ""
 
 
 def _to_user_application_read(db: Session, application: Application) -> UserApplicationRead:
@@ -32,10 +44,14 @@ def _to_user_application_read(db: Session, application: Application) -> UserAppl
     reflects the listing's current name; falls back to "" if the listing was
     since deleted, which the frontend renders gracefully."""
     listing = db.get(Listing, application.listing_id)
+    property_address, property_city, host_name = _property_and_host(db, listing)
     return UserApplicationRead(
         id=application.id,
         listing_id=application.listing_id,
         listing_name=listing.name if listing else "",
+        property_address=property_address,
+        property_city=property_city,
+        host_name=host_name,
         status=application.status,
         message=application.message,
         desired_move_in=application.desired_move_in,
@@ -44,25 +60,24 @@ def _to_user_application_read(db: Session, application: Application) -> UserAppl
     )
 
 
-def _get_or_create_user_guest(db: Session, user: UserAccount) -> Guest:
-    """Get or create a Guest entry linked to a user."""
-    existing = db.scalar(select(Guest).where(Guest.email == user.email))
-    if existing:
-        return existing
-
-    guest = Guest(
-        id=new_id("G"),
-        name=user.full_name,
-        email=user.email,
-        phone=user.phone,
-        avatar=dicebear_avatar(user.full_name),
-        location="",
-        joined_at=date_.today(),
-        status="active",
+def _to_user_occupancy_read(db: Session, occupancy: Occupancy) -> UserOccupancyRead:
+    listing = db.get(Listing, occupancy.listing_id)
+    property_address, property_city, host_name = _property_and_host(db, listing)
+    return UserOccupancyRead(
+        id=occupancy.id,
+        listing_id=occupancy.listing_id,
+        listing_name=listing.name if listing else "",
+        room_id=occupancy.room_id,
+        property_address=property_address,
+        property_city=property_city,
+        host_name=host_name,
+        status=occupancy.status,
+        move_in_date=occupancy.move_in_date,
+        expected_end_date=occupancy.expected_end_date,
+        move_out_date=occupancy.move_out_date,
+        created_at=occupancy.created_at,
+        ended_at=occupancy.ended_at,
     )
-    db.add(guest)
-    db.flush()
-    return guest
 
 
 @router.post("/applications", response_model=UserApplicationRead, status_code=status.HTTP_201_CREATED)
@@ -83,7 +98,7 @@ def submit_rental_application(
         )
 
     # Get or create guest for this user
-    guest = _get_or_create_user_guest(db, user)
+    guest = get_or_create_guest_for_user(db, user)
 
     # Submit application using existing CRUD logic
     from app.schemas.leasing import ApplicationCreate
@@ -128,7 +143,7 @@ def list_user_applications(
         return []
 
     # Get guest associated with this user
-    guest = db.scalar(select(Guest).where(Guest.email == user.email))
+    guest = get_guest_for_user(db, user)
     if not guest:
         return []
 
@@ -155,7 +170,7 @@ def get_application_details(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
 
     # Verify the application belongs to this user
-    guest = db.scalar(select(Guest).where(Guest.email == user.email))
+    guest = get_guest_for_user(db, user)
     if not guest or application.guest_id != guest.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only view your own applications")
 
@@ -175,7 +190,7 @@ def withdraw_application(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Application not found")
 
     # Verify ownership
-    guest = db.scalar(select(Guest).where(Guest.email == user.email))
+    guest = get_guest_for_user(db, user)
     if not guest or application.guest_id != guest.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only withdraw your own applications")
 
@@ -207,7 +222,7 @@ def list_user_occupancies(
     db: Session = Depends(get_db),
 ):
     """List all active and past occupancies (rentals) for current user."""
-    guest = db.scalar(select(Guest).where(Guest.email == user.email))
+    guest = get_guest_for_user(db, user)
     if not guest:
         return []
 
@@ -219,20 +234,7 @@ def list_user_occupancies(
         )
     )
 
-    return [
-        UserOccupancyRead(
-            id=occ.id,
-            listing_id=occ.listing_id,
-            room_id=occ.room_id,
-            status=occ.status,
-            move_in_date=occ.move_in_date,
-            expected_end_date=occ.expected_end_date,
-            move_out_date=occ.move_out_date,
-            created_at=occ.created_at,
-            ended_at=occ.ended_at,
-        )
-        for occ in occupancies
-    ]
+    return [_to_user_occupancy_read(db, occ) for occ in occupancies]
 
 
 @router.get("/occupancies/{occupancy_id}", response_model=UserOccupancyRead)
@@ -247,21 +249,11 @@ def get_occupancy_details(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Occupancy not found")
 
     # Verify ownership
-    guest = db.scalar(select(Guest).where(Guest.email == user.email))
+    guest = get_guest_for_user(db, user)
     if not guest or occupancy.guest_id != guest.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only view your own occupancies")
 
-    return UserOccupancyRead(
-        id=occupancy.id,
-        listing_id=occupancy.listing_id,
-        room_id=occupancy.room_id,
-        status=occupancy.status,
-        move_in_date=occupancy.move_in_date,
-        expected_end_date=occupancy.expected_end_date,
-        move_out_date=occupancy.move_out_date,
-        created_at=occupancy.created_at,
-        ended_at=occupancy.ended_at,
-    )
+    return _to_user_occupancy_read(db, occupancy)
 
 
 @router.post("/occupancies/{occupancy_id}/sublet-request", response_model=SubletRequestRead, status_code=status.HTTP_201_CREATED)
@@ -280,7 +272,7 @@ def submit_sublet_request(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "occupancyId must match the requested occupancy")
 
     # Verify the user owns the occupancy
-    guest = db.scalar(select(Guest).where(Guest.email == user.email))
+    guest = get_guest_for_user(db, user)
     if not guest or occupancy.guest_id != guest.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only sublet your own occupancies")
 
@@ -318,7 +310,7 @@ def list_user_sublet_requests(
     """List all sublet requests initiated by current user."""
     from app.models.sublet_request import SubletRequest
 
-    guest = db.scalar(select(Guest).where(Guest.email == user.email))
+    guest = get_guest_for_user(db, user)
     if not guest:
         return []
 
@@ -346,3 +338,20 @@ def list_user_sublet_requests(
         )
         for sr in sublet_requests
     ]
+
+
+@router.post("/reviews", response_model=ReviewRead, status_code=status.HTTP_201_CREATED)
+def submit_review(
+    payload: ReviewCreate,
+    user: UserAccount = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """A renter may review a listing only once they've actually had an
+    Occupancy there -- see review_crud.guest_has_stayed_at_listing. Rejects
+    with 403 if they never rented it, 409 on a duplicate review, matching the
+    existing ownership-check style used elsewhere in this router."""
+    guest = get_guest_for_user(db, user)
+    if not guest:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only review a listing you have rented")
+    review = review_crud.create_review(db, guest.id, payload)
+    return review_crud.to_review_read(review)
