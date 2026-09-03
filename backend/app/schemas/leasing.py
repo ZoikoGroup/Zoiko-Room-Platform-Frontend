@@ -119,6 +119,9 @@ class UserApplicationRead(CamelModel):
     id: int
     listing_id: str
     listing_name: str = ""
+    property_address: str = ""
+    property_city: str = ""
+    host_name: str = ""
     status: str
     message: str
     desired_move_in: date | None
@@ -131,7 +134,11 @@ class UserOccupancyRead(CamelModel):
 
     id: int
     listing_id: str
+    listing_name: str = ""
     room_id: int
+    property_address: str = ""
+    property_city: str = ""
+    host_name: str = ""
     status: str
     move_in_date: date | None
     expected_end_date: date | None

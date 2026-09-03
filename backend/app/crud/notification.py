@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.admin_user import AdminUser
+from app.models.guest import Guest
 from app.models.notification import Notification
 from app.models.user_account import UserAccount
 
@@ -73,13 +74,23 @@ def notify_user_by_party(db: Session, party_id: int | None, **kwargs) -> Notific
     return notify_user(db, user.id, **kwargs)
 
 
-def notify_user_by_guest_email(db: Session, guest_email: str, **kwargs) -> Notification | None:
-    """Looks up the UserAccount linked to a Guest record by email -- the same
-    Guest<->UserAccount link already used across the rentals/sublet flows."""
-    user = db.scalar(select(UserAccount).where(UserAccount.email == guest_email))
-    if not user:
-        return None
-    return notify_user(db, user.id, **kwargs)
+def notify_user_by_guest(db: Session, guest: Guest, **kwargs) -> Notification | None:
+    """Notifies the UserAccount linked to a Guest via the real
+    user_account_id FK (see models/guest.py). Falls back to an email match
+    (and opportunistically backfills the FK) for a guest that hasn't gone
+    through crud.guest.get_guest_for_user yet -- same self-healing rule used
+    there, applied from the guest side. No-ops silently if neither resolves
+    (e.g. a walk-in tenant from the legacy admin Booking flow with no
+    self-service account at all), same as notify_user_by_party."""
+    user_id = guest.user_account_id
+    if not user_id:
+        user = db.scalar(select(UserAccount).where(UserAccount.email == guest.email))
+        if not user:
+            return None
+        guest.user_account_id = user.id
+        db.flush()
+        user_id = user.id
+    return notify_user(db, user_id, **kwargs)
 
 
 def notify_admin(

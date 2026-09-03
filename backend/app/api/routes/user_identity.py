@@ -12,7 +12,11 @@ from app.models.identity_verification import IdentityVerification
 from app.models.user_account import UserAccount
 from app.schemas.marketplace import IdentityVerificationUserRead
 
-router = APIRouter(prefix="/api/users/identity-verifications", tags=["user-identity-verifications"])
+router = APIRouter(
+    prefix="/api/users/identity-verifications",
+    tags=["user-identity-verifications"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 def _to_user_read(record: IdentityVerification) -> dict:

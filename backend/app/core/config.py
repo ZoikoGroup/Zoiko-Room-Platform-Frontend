@@ -17,10 +17,10 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 1440
     cors_origins: str = "http://localhost:3000"
     cookie_secure: bool = False
-    # Left blank -> host-only cookie (correct when frontend/backend are on different
-    # registrable domains, e.g. a Vercel URL calling a Render URL). Set to
-    # ".zoikorooms.com" once both sides sit under that shared domain.
-    cookie_domain: str = ""
+    # None scopes the cookie to the exact request host (required for localhost, and
+    # for cross-domain setups like Vercel + Render). Set to ".zoikorooms.com" in
+    # production once frontend/backend share that domain.
+    cookie_domain: str | None = None
 
     seed_admin_email: str = "admin@zoikorooms.com"
     seed_admin_password: str = "change-this-password"

@@ -12,8 +12,71 @@ from app.crud.user import get_user_by_party_id
 from app.models.admin_user import AdminUser
 from app.models.listing import Listing, MAX_LISTING_IMAGES, SUPPORTED_CURRENCIES
 from app.models.market_release import MarketRelease
+from app.models.occupancy import Occupancy
 from app.models.room import Room
 from app.schemas.listing import ListingCreate, ListingUpdate, PublicListingRead
+
+
+def _occupied_room_ids(db: Session) -> set[int]:
+    """Rooms committed to a tenant right now. Single source of truth for "is
+    this room actually available" -- every place that decides whether a
+    listing should be shown as live/bookable must go through this (or
+    annotate_availability/list_public_listings below) rather than trusting
+    Listing.state alone, which only reflects the admin approval workflow and
+    says nothing about whether a renter has since signed a lease or moved in.
+
+    Excludes only ENDED occupancies: PENDING_MOVE_IN already means a signed
+    agreement committed this room to a specific renter (Occupancy is only
+    created once the agreement is signed -- see models/occupancy.py), so a
+    room isn't "free again" just because move-in hasn't physically happened
+    yet."""
+    return set(
+        db.scalars(select(Occupancy.room_id).where(Occupancy.status != "ENDED"))
+    )
+
+
+def _canonical_location(db: Session, room_id: int | None) -> dict:
+    """Property.address/city is the canonical source of truth for where a
+    listing physically is -- resolves the property/listing conflict where a
+    listing's independently-typed city/location could otherwise drift from
+    the property record it belongs to. Deliberately does not touch
+    latitude/longitude: no geocoding provider is wired up, and integrating one
+    is a separate, explicitly out-of-scope product decision."""
+    if room_id is None:
+        return {}
+    room = db.get(Room, room_id)
+    if room is None or room.property is None:
+        return {}
+    return {"city": room.property.city, "location": room.property.address}
+
+
+def is_listing_available(db: Session, listing: Listing) -> bool:
+    """True only when the listing is published, its room (if any) is active,
+    and that room has no active occupancy. Read-only -- never mutates
+    Listing.state, which stays admin-approval-workflow-only."""
+    if listing.state != "PUBLISHED":
+        return False
+    if listing.room_id is None:
+        return True
+    room = listing.room
+    if room is not None and room.status != "active":
+        return False
+    return listing.room_id not in _occupied_room_ids(db)
+
+
+def annotate_availability(db: Session, listings: list[Listing]) -> list[Listing]:
+    """Set a transient `.available` attribute (not a DB column) on each listing
+    so ListingRead can expose real-time availability without duplicating this
+    query's logic at every call site. Bulk-computes the occupied set once."""
+    occupied = _occupied_room_ids(db)
+    for listing in listings:
+        room = listing.room
+        listing.available = (
+            listing.state == "PUBLISHED"
+            and (listing.room_id is None or (room is not None and room.status == "active"))
+            and listing.room_id not in occupied
+        )
+    return listings
 
 
 def _validate_currency(currency: str) -> None:
@@ -71,12 +134,24 @@ def list_public_listings(
     """Server-side filtered, paginated public listing search. Only ever returns
     PUBLISHED listings -- unpublished/withdrawn/draft/etc. states are never
     reachable through this path regardless of what filters are supplied.
+    Also excludes listings whose room is currently occupied (active occupancy)
+    or inactive -- state=PUBLISHED alone doesn't mean a renter hasn't since
+    moved in, and search results must never show an occupied room as bookable.
 
     exclude_party_id: when the caller is an authenticated USER, their own
     party's listings are left out of their own search results -- a host should
     never see (or be able to apply to) a room they list themselves. Admin-owned
     listings (party_id is NULL) are never affected by this."""
+    occupied_room_ids = _occupied_room_ids(db)
     conditions = [Listing.state == "PUBLISHED"]
+    if occupied_room_ids:
+        conditions.append(
+            (Listing.room_id.is_(None)) | (Listing.room_id.not_in(occupied_room_ids))
+        )
+    conditions.append(
+        (Listing.room_id.is_(None))
+        | Listing.room_id.in_(select(Room.id).where(Room.status == "active"))
+    )
     if city:
         conditions.append(Listing.city.ilike(f"%{city.strip()}%"))
     if room_type:
@@ -147,6 +222,8 @@ def create_listing(db: Session, data: ListingCreate, owner: AdminUser) -> Listin
     _validate_currency(data.currency)
     _validate_image_count(data.images)
 
+    payload = data.model_dump()
+    payload.update(_canonical_location(db, data.room_id))
     listing = Listing(
         id=new_id("L"),
         slug=slugify(data.name),
@@ -155,7 +232,7 @@ def create_listing(db: Session, data: ListingCreate, owner: AdminUser) -> Listin
         owner_id=owner.id,
         state="DRAFT",
         market_release_id=_resolve_market_release_id_for_room(db, data.room_id),
-        **data.model_dump(),
+        **payload,
     )
     db.add(listing)
     db.commit()
@@ -173,11 +250,13 @@ def create_listing_for_party(db: Session, data: ListingCreate, party_id: int) ->
     _validate_image_count(data.images)
 
     assert_party_owns_room(db, data.room_id, party_id)
+    payload = data.model_dump()
+    payload.update(_canonical_location(db, data.room_id))
     listing = Listing(
         id=new_id("L"), slug=slugify(data.name), rating=4.5, review_count=0,
         owner_id=None, party_id=party_id, state="DRAFT",
         market_release_id=_resolve_market_release_id_for_room(db, data.room_id),
-        **data.model_dump(),
+        **payload,
     )
     db.add(listing)
     db.commit()
@@ -216,6 +295,8 @@ def update_listing(db: Session, listing: Listing, data: ListingUpdate) -> Listin
         setattr(listing, field, value)
     if "room_id" in updates:
         listing.market_release_id = _resolve_market_release_id_for_room(db, listing.room_id)
+        for field, value in _canonical_location(db, listing.room_id).items():
+            setattr(listing, field, value)
     db.commit()
     db.refresh(listing)
     return listing

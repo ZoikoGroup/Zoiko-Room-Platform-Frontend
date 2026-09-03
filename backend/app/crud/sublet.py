@@ -11,7 +11,7 @@ from app.models.party import Party
 from app.models.sublet_request import SubletRequest
 from app.models.user_account import UserAccount
 from app.models.guest import Guest
-from app.crud.ids import dicebear_avatar, new_id
+from app.crud import guest as guest_crud
 from app.crud import notification as notif_crud
 
 
@@ -33,16 +33,7 @@ def _guest_for_proposed_party(db: Session, party_id: int) -> Guest:
     )
     if not user:
         raise HTTPException(status.HTTP_409_CONFLICT, "Proposed renter party has no active user account")
-    guest = db.scalar(select(Guest).where(Guest.email == user.email))
-    if guest:
-        return guest
-    guest = Guest(
-        id=new_id("G"), name=user.full_name, email=user.email, phone=user.phone,
-        avatar=dicebear_avatar(user.full_name), location="", joined_at=date.today(), status="active",
-    )
-    db.add(guest)
-    db.flush()
-    return guest
+    return guest_crud.get_or_create_guest_for_user(db, user)
 
 
 def submit_sublet_request(
@@ -148,16 +139,20 @@ def verify_sublet_identity(
     return verification is not None
 
 
-def _notify_sublet_requester(db: Session, requester_guest_id: str, *, approved: bool, notes: str) -> None:
+def _notify_sublet_requester(
+    db: Session, requester_guest_id: str, sublet_request_id: int, *, approved: bool, notes: str
+) -> None:
     guest = db.get(Guest, requester_guest_id)
     if not guest:
         return
     verb = "approved" if approved else "rejected"
-    notif_crud.notify_user_by_guest_email(
-        db, guest.email,
+    notif_crud.notify_user_by_guest(
+        db, guest,
         title=f"Sublet request {verb}",
         message=notes or f"Your sublet request was {verb}.",
         notification_type=f"sublet_request.{verb}",
+        related_entity_type="sublet_request",
+        related_entity_id=str(sublet_request_id),
     )
 
 
@@ -184,7 +179,7 @@ def approve_sublet_request(db: Session, sublet_request: SubletRequest, admin: Ad
     sublet_request.decided_by_admin_id = admin.id
     sublet_request.decided_at = datetime.now(timezone.utc)
 
-    _notify_sublet_requester(db, requester_guest_id, approved=True, notes=notes)
+    _notify_sublet_requester(db, requester_guest_id, sublet_request.id, approved=True, notes=notes)
 
     db.commit()
     db.refresh(sublet_request)
@@ -204,7 +199,9 @@ def reject_sublet_request(db: Session, sublet_request: SubletRequest, admin: Adm
     sublet_request.decided_by_admin_id = admin.id
     sublet_request.decided_at = datetime.now(timezone.utc)
 
-    _notify_sublet_requester(db, sublet_request.current_occupancy.guest_id, approved=False, notes=notes)
+    _notify_sublet_requester(
+        db, sublet_request.current_occupancy.guest_id, sublet_request.id, approved=False, notes=notes
+    )
 
     db.commit()
     db.refresh(sublet_request)

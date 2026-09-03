@@ -7,7 +7,10 @@ class OccupancyRead(CamelModel):
     id: int
     offer_id: int
     listing_id: str
+    listing_name: str
     room_id: int
+    property_address: str
+    property_city: str
     guest_id: str
     guest_name: str
     status: str

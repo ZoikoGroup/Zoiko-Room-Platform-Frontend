@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.crud.ids import dicebear_avatar, new_id
+from app.crud.listing import is_listing_available
 from app.models.booking import Booking
 from app.models.guest import Guest
 from app.models.listing import Listing
@@ -73,7 +74,7 @@ def create_booking(db: Session, data: BookingCreate) -> BookingRead:
     listing = db.get(Listing, data.listing_id)
     if not listing:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Listing not found")
-    if listing.state != "PUBLISHED":
+    if not is_listing_available(db, listing):
         raise HTTPException(status.HTTP_409_CONFLICT, "Listing is not currently available for booking")
 
     guest = _resolve_guest(db, data)
