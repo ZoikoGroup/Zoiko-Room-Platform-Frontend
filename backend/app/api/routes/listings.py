@@ -27,7 +27,7 @@ def _assert_owner_or_super_admin(listing, admin: AdminUser) -> None:
 
 @router.get("", response_model=list[ListingRead])
 def list_listings(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
-    return crud.list_listings_for(db, admin)
+    return crud.annotate_availability(db, crud.list_listings_for(db, admin))
 
 
 @router.post("", response_model=ListingRead, status_code=status.HTTP_201_CREATED)

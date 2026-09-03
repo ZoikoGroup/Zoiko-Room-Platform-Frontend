@@ -40,6 +40,9 @@ class PaymentAllocationRead(CamelModel):
     obligation_id: int
     amount_allocated: float
     created_at: datetime
+    # Populated by crud.finance._annotate_payment_context -- not a DB column on
+    # PaymentAllocation, which only stores the raw obligation_id.
+    obligation_type: str = ""
 
 
 class SimulatedPaymentRead(CamelModel):
@@ -52,6 +55,15 @@ class SimulatedPaymentRead(CamelModel):
     created_at: datetime
     confirmed_at: datetime | None
     allocations: list[PaymentAllocationRead] = []
+    # Populated by crud.finance._annotate_payment_context. property/room/listing
+    # come from the occupancy behind this payment's first allocation, if any --
+    # a payment can in principle span more than one obligation, but in practice
+    # always represents one tenant's charge for one room.
+    guest_name: str = ""
+    listing_id: str | None = None
+    listing_name: str = ""
+    room_id: int | None = None
+    property_address: str = ""
 
 
 class DepositRecordRead(CamelModel):

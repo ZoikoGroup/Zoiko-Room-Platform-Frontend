@@ -6,6 +6,7 @@ import { AlertTriangle, Bath, BedDouble, ChevronLeft, ChevronRight, MapPin, Rule
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Loader } from "@/components/ui/Loader";
+import { StarRating } from "@/components/ui/StarRating";
 import { PublicListing } from "@/lib/types";
 import { formatCurrency, resolveImageUrl } from "@/lib/utils";
 import { errorMessage, listPublicListings, listRentalApplications } from "@/lib/user-api";
@@ -234,9 +235,19 @@ export function RentBrowser() {
                       <MapPin className="h-3.5 w-3.5" /> {listing.location}, {listing.city}
                     </p>
 
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      <StarRating rating={listing.rating} size={12} />
+                      <span className="text-xs text-slate-400">
+                        {listing.rating.toFixed(1)} ({listing.reviewCount} review{listing.reviewCount === 1 ? "" : "s"})
+                      </span>
+                    </div>
+
                     <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                       <span className="flex items-center gap-1">
                         <Users className="h-3.5 w-3.5" /> {listing.guests} guest{listing.guests === 1 ? "" : "s"}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <BedDouble className="h-3.5 w-3.5" /> {listing.bedrooms} bed{listing.bedrooms === 1 ? "" : "s"}
                       </span>
                       <span className="flex items-center gap-1">
                         <Bath className="h-3.5 w-3.5" /> {listing.bathrooms}
@@ -247,6 +258,21 @@ export function RentBrowser() {
                         </span>
                       )}
                     </div>
+
+                    {listing.amenities.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {listing.amenities.slice(0, 3).map((amenity) => (
+                          <Badge key={amenity} tone="neutral" className="!text-[10px]">
+                            {amenity}
+                          </Badge>
+                        ))}
+                        {listing.amenities.length > 3 && (
+                          <Badge tone="neutral" className="!text-[10px]">
+                            +{listing.amenities.length - 3} more
+                          </Badge>
+                        )}
+                      </div>
+                    )}
 
                     {listing.description && (
                       <p className="mt-3 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">

@@ -19,8 +19,11 @@ def _set_auth_cookie(response: Response, email: str) -> None:
         value=token,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="lax",
-        domain=".zoikorooms.com",
+        # SameSite=None is required for the cookie to be sent on cross-site requests
+        # (frontend and backend on different domains) -- but browsers only honor
+        # None when Secure is also set, so fall back to Lax for local http dev.
+        samesite="none" if settings.cookie_secure else "lax",
+        domain=settings.cookie_domain,
         max_age=settings.jwt_expire_minutes * 60,
         path="/",
     )
@@ -49,7 +52,7 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
 
 @router.post("/logout")
 def logout(response: Response):
-    response.delete_cookie(COOKIE_NAME, path="/")
+    response.delete_cookie(COOKIE_NAME, path="/", domain=settings.cookie_domain)
     return {"ok": True}
 
 

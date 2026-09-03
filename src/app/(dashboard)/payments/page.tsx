@@ -20,9 +20,9 @@ export default async function AdminPaymentsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Total Collected" value={formatCurrency(collected)} change="+9.2%" icon={Wallet} index={0} />
-        <StatCard label="Pending Dues" value={formatCurrency(pending)} change="-3.1%" trend="down" icon={CreditCard} index={1} />
-        <StatCard label="Refunded" value={formatCurrency(refunded)} change="+1.4%" icon={RefreshCcw} index={2} />
+        <StatCard label="Total Collected" value={formatCurrency(collected)} icon={Wallet} index={0} />
+        <StatCard label="Pending Dues" value={formatCurrency(pending)} icon={CreditCard} index={1} />
+        <StatCard label="Refunded" value={formatCurrency(refunded)} icon={RefreshCcw} index={2} />
       </div>
 
       <PaymentsTable payments={payments} />

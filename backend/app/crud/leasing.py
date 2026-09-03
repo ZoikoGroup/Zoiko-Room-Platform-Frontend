@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.eligibility import check_agreement_eligibility, check_offer_eligibility
 from app.crud.ids import dicebear_avatar, new_id
+from app.crud.listing import is_listing_available
 from app.crud import notification as notif_crud
 from app.crud.party import assert_provider_access, party_id_for_listing
 from app.models.admin_user import AdminUser
@@ -75,7 +76,7 @@ def submit_application(db: Session, data: ApplicationCreate) -> Application:
     listing = db.get(Listing, data.listing_id)
     if not listing:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Listing not found")
-    if listing.state != "PUBLISHED":
+    if not is_listing_available(db, listing):
         raise HTTPException(status.HTTP_409_CONFLICT, "This listing is not currently accepting applications")
 
     guest = _resolve_guest(db, data)
@@ -153,8 +154,8 @@ def decide_application(db: Session, application: Application, admin: AdminUser, 
     guest = db.get(Guest, application.guest_id)
     if guest:
         verb = "approved" if data.decision == "APPROVED" else "rejected"
-        notif_crud.notify_user_by_guest_email(
-            db, guest.email,
+        notif_crud.notify_user_by_guest(
+            db, guest,
             title=f"Your rental application was {verb}",
             message=data.note or f"Your application for listing {application.listing_id} was {verb}.",
             notification_type=f"application.{verb}",

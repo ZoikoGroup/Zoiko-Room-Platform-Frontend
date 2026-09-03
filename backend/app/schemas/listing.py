@@ -5,6 +5,13 @@ class ListingBase(CamelModel):
     name: str
     property_type: str = "private_room"
     room_type: str
+    # city/location: accepted here for backward compatibility, but when
+    # room_id is set the server overwrites both from the room's Property
+    # (address/city) -- see crud.listing._canonical_location -- so Property
+    # stays the single canonical location source. latitude/longitude are
+    # listing-owned with no canonical source (no geocoding provider wired up);
+    # the frontend should treat them as author-supplied map pins, not derived
+    # from city/location.
     city: str
     location: str
     latitude: float | None = None
@@ -71,6 +78,10 @@ class ListingRead(ListingBase):
     contact_name: str = ""
     contact_phone: str = ""
     contact_email: str = ""
+    # Real-time: PUBLISHED state alone doesn't mean a renter hasn't since
+    # moved in. Computed by crud.listing.annotate_availability/is_listing_available
+    # -- never trust Listing.state alone for "is this actually live" in a new caller.
+    available: bool = True
 
 
 class ListingRejectRequest(CamelModel):
