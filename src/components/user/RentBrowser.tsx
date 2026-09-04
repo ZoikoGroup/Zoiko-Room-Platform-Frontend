@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, Bath, BedDouble, ChevronLeft, ChevronRight, MapPin, Ruler, Search, Users } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -29,8 +30,9 @@ interface FilterState {
 const emptyFilters: FilterState = { city: "", roomType: "", minPrice: "", maxPrice: "" };
 
 export function RentBrowser() {
-  const { identityVerified } = useUserSession();
+  const { user, identityVerified } = useUserSession();
   const { toast, showToast } = useToast();
+  const router = useRouter();
 
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const [offset, setOffset] = useState(0);
@@ -111,7 +113,19 @@ export function RentBrowser() {
     setOffset((prev) => Math.max(0, prev + (direction === "next" ? PAGE_SIZE : -PAGE_SIZE)));
   }
 
+  function viewDetails(listingId: string) {
+    if (!user) {
+      router.push("/account/login");
+      return;
+    }
+    setDetailListingId(listingId);
+  }
+
   function openApply(listing: PublicListing) {
+    if (!user) {
+      router.push("/account/login");
+      return;
+    }
     setSelected(listing);
   }
 
@@ -127,13 +141,15 @@ export function RentBrowser() {
 
   return (
     <div className="space-y-5">
-      <IdentityGate action="apply for a room">
-        <Card className="!bg-emerald-50 !ring-emerald-200 dark:!bg-emerald-500/10 dark:!ring-emerald-500/20">
-          <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-            Your identity is verified — you can apply to any room below.
-          </p>
-        </Card>
-      </IdentityGate>
+      {user && (
+        <IdentityGate action="apply for a room">
+          <Card className="!bg-emerald-50 !ring-emerald-200 dark:!bg-emerald-500/10 dark:!ring-emerald-500/20">
+            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+              Your identity is verified — you can apply to any room below.
+            </p>
+          </Card>
+        </IdentityGate>
+      )}
 
       <Card>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -207,7 +223,7 @@ export function RentBrowser() {
                 >
                   <button
                     type="button"
-                    onClick={() => setDetailListingId(listing.id)}
+                    onClick={() => viewDetails(listing.id)}
                     className="block w-full text-left"
                     aria-label={`View details for ${listing.name}`}
                   >
@@ -224,7 +240,7 @@ export function RentBrowser() {
                   <div className="flex flex-1 flex-col p-4">
                     <button
                       type="button"
-                      onClick={() => setDetailListingId(listing.id)}
+                      onClick={() => viewDetails(listing.id)}
                       className="flex items-start justify-between gap-2 text-left"
                     >
                       <p className="font-heading text-sm font-bold text-primary-900 dark:text-white hover:underline">{listing.name}</p>
@@ -291,7 +307,7 @@ export function RentBrowser() {
                       <Button
                         size="sm"
                         variant={applied ? "outline" : "primary"}
-                        disabled={!identityVerified || applied}
+                        disabled={applied || (Boolean(user) && !identityVerified)}
                         onClick={() => openApply(listing)}
                       >
                         {applied ? "Applied" : "Apply"}

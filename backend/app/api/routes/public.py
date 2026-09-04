@@ -2,14 +2,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_optional
+from app.core.mailer import send_alert_confirmation_email
 from app.crud.leasing import submit_application, to_application_read
 from app.crud.listing import get_listing, is_listing_available, list_public_listings, to_public_listing_read
 from app.crud.review import list_reviews_for_listing
+from app.crud.room_alert import create_alert, unsubscribe_alert
 from app.db.session import get_db
 from app.models.user_account import UserAccount
 from app.schemas.leasing import ApplicationCreate, ApplicationRead
 from app.schemas.listing import PublicListingRead, PublicListingsPage
 from app.schemas.review import ReviewRead
+from app.schemas.room_alert import RoomAlertCreate, RoomAlertRead
+from app.core.config import settings
 
 router = APIRouter(prefix="/api/public", tags=["public"])
 
@@ -86,3 +90,29 @@ def post_application(payload: ApplicationCreate, db: Session = Depends(get_db)):
     """No auth -- the separate renter-facing website submits directly on a renter's
     behalf, same as the existing new-guest booking flow."""
     return to_application_read(submit_application(db, payload))
+
+
+@router.post("/alerts", response_model=RoomAlertRead, status_code=status.HTTP_201_CREATED)
+def post_alert(payload: RoomAlertCreate, db: Session = Depends(get_db)):
+    """No auth -- reached from the marketing site's "Save City Alert"/"Create a
+    free alert" buttons, before a visitor has any account. Matching new
+    PUBLISHED listings against active alerts and emailing subscribers is a
+    separate scheduled job (see check_alerts.py), not done here."""
+    if not payload.email.strip() or "@" not in payload.email:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A valid email is required")
+    if not payload.city.strip():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "city is required")
+
+    alert = create_alert(db, payload)
+    unsubscribe_url = f"{settings.public_api_url}/api/public/alerts/{alert.id}/unsubscribe?token={alert.unsubscribe_token}"
+    send_alert_confirmation_email(alert.email, alert.city, unsubscribe_url)
+    return alert
+
+
+@router.get("/alerts/{alert_id}/unsubscribe")
+def get_alert_unsubscribe(alert_id: str, token: str, db: Session = Depends(get_db)):
+    """No auth -- the token itself (from the alert's own confirmation/match
+    emails) is what proves the caller owns this alert."""
+    if not unsubscribe_alert(db, alert_id, token):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Alert not found")
+    return {"unsubscribed": True}

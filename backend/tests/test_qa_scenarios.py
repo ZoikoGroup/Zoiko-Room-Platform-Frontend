@@ -16,7 +16,12 @@ The pytest entrypoints assert the expectations; failures are defects.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
+
+# Directory a subprocess-spawned test needs to run from -- derived from this
+# file's own location rather than hardcoded, so it works on any machine/checkout.
+BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 import pytest
 from unittest.mock import patch
@@ -554,7 +559,7 @@ def test_F_production_boot_refused():
         "os.environ['COOKIE_SECURE']='false'; os.environ.pop('JWT_SECRET',None); "
         "from app.core.config import Settings; Settings()"
     )
-    p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=r"D:\Zoikoroom_platform\Zoiko-Room-Platform\backend")
+    p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=BACKEND_DIR)
     assert p.returncode != 0, f"expected ValueError, got rc=0:\n{p.stdout}"
     assert "Refusing to boot in production" in p.stderr + p.stdout
 
@@ -624,7 +629,7 @@ def test_F_cookie_flags_production_like():
         # inspect a route that sets an auth cookie to see Secure flag
         print('secure-setting-present')
     """)
-    p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=r"D:\Zoikoroom_platform\Zoiko-Room-Platform\backend")
+    p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=BACKEND_DIR)
     assert "health 200" in p.stdout, (p.stdout, p.stderr)
 
 

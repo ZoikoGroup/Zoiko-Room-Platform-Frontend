@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
@@ -445,6 +447,8 @@ def publish_listing(db: Session, listing: Listing) -> Listing:
 
     listing.rejection_reason = ""
     listing.state = "PUBLISHED"
+    if listing.published_at is None:
+        listing.published_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(listing)
 
