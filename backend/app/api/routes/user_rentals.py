@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -27,6 +28,8 @@ from app.schemas.leasing import UserApplicationRead, UserApplicationSubmitReques
 from app.schemas.review import ReviewCreate, ReviewRead
 
 router = APIRouter(prefix="/api/users/rentals", tags=["user-rentals"], dependencies=[Depends(get_current_user)])
+
+logger = logging.getLogger("zoiko.user_rentals")
 
 
 def _property_and_host(db: Session, listing: Listing | None) -> tuple[str, str, str]:
@@ -136,8 +139,13 @@ def submit_rental_application(
         db.commit()
 
         return _to_user_application_read(db, application)
-    except Exception as e:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+    except HTTPException:
+        # A deliberate, safe error from submit_application (e.g. 404/409) --
+        # pass it through unchanged instead of flattening it to a 400.
+        raise
+    except Exception:
+        logger.exception("rental application submission failed for user %s", user.id)
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Could not submit your application. Please try again.")
 
 
 @router.get("/applications", response_model=list[UserApplicationRead])

@@ -572,9 +572,14 @@ def test_F_rate_limit_429_and_reset(client, db_session):
     cookies = auth_user_cookie(user)
     payload = {"content": "hi"}
     statuses = []
-    for _ in range(chat_limiter.max_requests + 3):
-        r = client.post(f"/api/users/chat/conversations/{conv}/messages/stream", json=payload, cookies=cookies)
-        statuses.append(r.status_code)
+    # Mocked like every other stream test in this file -- a real Groq call here
+    # made this test network-timing dependent: on a slow/unreachable connection,
+    # the 23 live round-trips could eat enough wall-clock time that the limiter's
+    # fixed window reset mid-test, so the final request was no longer over-limit.
+    with patch("app.services.chat_service.build_client", side_effect=lambda: _text_client("hi")):
+        for _ in range(chat_limiter.max_requests + 3):
+            r = client.post(f"/api/users/chat/conversations/{conv}/messages/stream", json=payload, cookies=cookies)
+            statuses.append(r.status_code)
     assert statuses[-1] == 429, f"expected last 429, got {statuses}"
     # Does the limiter's window reset behaviour allow a later request?
     assert chat_limiter.allow(f"user:{user.id}") is False

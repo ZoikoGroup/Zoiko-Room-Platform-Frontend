@@ -95,28 +95,6 @@ def submit_sublet_request(
     return sublet_request
 
 
-def list_sublet_requests_for_user(db: Session, user: UserAccount) -> list[SubletRequest]:
-    """List all sublet requests initiated by current user."""
-    if not user.party_id:
-        return []
-
-    return list(
-        db.scalars(
-            select(SubletRequest)
-            .join(Occupancy, Occupancy.id == SubletRequest.current_occupancy_id)
-            .where(Occupancy.guest_id.in_(select(guest_id_from_user(user))))
-            .order_by(SubletRequest.created_at.desc())
-        )
-    )
-
-
-def guest_id_from_user(user: UserAccount) -> str:
-    """Get guest_id associated with user for queries."""
-    # This is a simple mapping - in practice, you'd query the Guest table
-    # For now, we'll handle this in the route layer
-    pass
-
-
 def get_sublet_request(db: Session, sublet_request_id: int) -> SubletRequest | None:
     return db.get(SubletRequest, sublet_request_id)
 

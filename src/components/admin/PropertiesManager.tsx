@@ -462,9 +462,15 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
               <Badge tone="primary" className="absolute left-3 top-3">
                 {listing.minStayNights}+ nights
               </Badge>
-              <Badge tone={listingStateTone[listing.state]} className="absolute right-3 top-3">
-                {listingStateLabel[listing.state]}
-              </Badge>
+              {listing.state === "PUBLISHED" && !listing.available ? (
+                <Badge tone="warning" className="absolute right-3 top-3">
+                  Occupied
+                </Badge>
+              ) : (
+                <Badge tone={listingStateTone[listing.state]} className="absolute right-3 top-3">
+                  {listingStateLabel[listing.state]}
+                </Badge>
+              )}
             </div>
             <div className="p-4">
               <h3 className="truncate font-heading text-sm font-bold text-primary-900 dark:text-white">{listing.name}</h3>
@@ -519,7 +525,16 @@ export function PropertiesManager({ initialListings }: { initialListings: Listin
                 </div>
               )}
               <div className="mt-2 flex items-center justify-between">
-                <StarRating rating={listing.rating} size={12} />
+                {listing.reviewCount > 0 ? (
+                  <div className="flex items-center gap-1.5">
+                    <StarRating rating={listing.rating} size={12} />
+                    <span className="text-xs text-slate-400">
+                      {listing.rating.toFixed(1)} ({listing.reviewCount})
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-xs font-medium text-slate-400 dark:text-slate-500">New · no reviews yet</span>
+                )}
                 <span className="text-sm font-bold text-primary-800 dark:text-primary-200">
                   {formatCurrency(listing.pricePerNight, listing.currency)}
                   <span className="text-xs font-medium text-slate-400 dark:text-slate-400">/night</span>

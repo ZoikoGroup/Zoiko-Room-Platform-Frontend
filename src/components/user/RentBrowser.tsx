@@ -252,10 +252,16 @@ export function RentBrowser() {
                     </p>
 
                     <div className="mt-1.5 flex items-center gap-1.5">
-                      <StarRating rating={listing.rating} size={12} />
-                      <span className="text-xs text-slate-400">
-                        {listing.rating.toFixed(1)} ({listing.reviewCount} review{listing.reviewCount === 1 ? "" : "s"})
-                      </span>
+                      {listing.reviewCount > 0 ? (
+                        <>
+                          <StarRating rating={listing.rating} size={12} />
+                          <span className="text-xs text-slate-400">
+                            {listing.rating.toFixed(1)} ({listing.reviewCount} review{listing.reviewCount === 1 ? "" : "s"})
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-xs font-medium text-slate-400">New · no reviews yet</span>
+                      )}
                     </div>
 
                     <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">

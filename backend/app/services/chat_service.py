@@ -691,8 +691,9 @@ def execute_tool(db: Session, actor: Actor, name: str, raw_args: str) -> tuple[l
     args = _parse_args(raw_args)
     try:
         return spec.handler(db, actor, args), True
-    except Exception as exc:  # noqa: BLE001 - surfaced to the model as a failed result
-        return [{"error": f"Tool failed: {exc}"}], True
+    except Exception:  # noqa: BLE001 - only a safe, generic result reaches the model
+        logger.exception("tool %r failed for actor role %r", name, is_actor(actor))
+        return [{"error": "Tool failed: couldn't fetch that data."}], True
 
 
 def stream_assistant_reply(

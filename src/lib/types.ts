@@ -55,6 +55,10 @@ export interface Listing {
   contactName: string;
   contactPhone: string;
   contactEmail: string;
+  // Real-time: state === "PUBLISHED" alone doesn't mean a renter hasn't since
+  // moved in. Computed server-side (crud.listing.annotate_availability) --
+  // never infer "is this actually live" from state alone.
+  available: boolean;
 }
 
 export interface PublishEligibility {
